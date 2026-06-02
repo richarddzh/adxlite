@@ -11,11 +11,19 @@ try {
         Write-Host "Removing .venv..." -ForegroundColor Cyan
         Remove-Item -Recurse -Force .venv
     }
-    if (Test-Path "*.egg-info" ) {
-        Remove-Item -Recurse -Force *.egg-info
+    # Clean adxpandas build artifacts
+    if (Test-Path "adxpandas\src\adxpandas.egg-info") {
+        Remove-Item -Recurse -Force "adxpandas\src\adxpandas.egg-info"
     }
-    if (Test-Path "src\adxlite.egg-info") {
-        Remove-Item -Recurse -Force "src\adxlite.egg-info"
+    if (Test-Path "adxpandas\dist") {
+        Remove-Item -Recurse -Force "adxpandas\dist"
+    }
+    # Clean adxlite build artifacts
+    if (Test-Path "adxlite\src\adxlite.egg-info") {
+        Remove-Item -Recurse -Force "adxlite\src\adxlite.egg-info"
+    }
+    if (Test-Path "adxlite\dist") {
+        Remove-Item -Recurse -Force "adxlite\dist"
     }
     Write-Host "Clean complete." -ForegroundColor Green
 } finally {

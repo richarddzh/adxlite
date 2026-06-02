@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from adxlite.exceptions import KqlParseError
+from adxpandas.exceptions import KqlParseError
 
 
 KEYWORDS = {

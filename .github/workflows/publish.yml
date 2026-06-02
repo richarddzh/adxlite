@@ -1,4 +1,4 @@
-name: Publish Package
+name: Publish Packages
 
 on:
   release:
@@ -22,8 +22,17 @@ jobs:
       - name: Install build tools
         run: pip install build
 
-      - name: Build sdist and wheel
-        run: python -m build
+      - name: Build adxpandas
+        run: python -m build ./adxpandas
+
+      - name: Build adxlite
+        run: python -m build ./adxlite
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp adxpandas/dist/* dist/
+          cp adxlite/dist/* dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

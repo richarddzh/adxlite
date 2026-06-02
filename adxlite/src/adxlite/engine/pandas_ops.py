@@ -6,7 +6,7 @@ from collections.abc import Iterable
 import pandas as pd
 
 from adxlite.exceptions import ExecutionError, KqlUnsupportedError
-from adxlite.parser.ast_nodes import (
+from adxpandas.parser.ast_nodes import (
     BetweenExpr,
     BinaryOp,
     CountOp,
@@ -31,7 +31,7 @@ from adxlite.parser.ast_nodes import (
     UnionOp,
     WhereOp,
 )
-from adxlite.storage import udf
+from adxpandas import functions as udf
 
 
 class PandasOperatorExecutor:

@@ -4,8 +4,8 @@ import pandas as pd
 
 from adxlite.engine.pandas_ops import PandasOperatorExecutor
 from adxlite.engine.planner import Planner
-from adxlite.parser import parse_kql
-from adxlite.parser.ast_nodes import (
+from adxpandas.parser import parse_kql
+from adxpandas.parser.ast_nodes import (
     AppendCommand,
     KqlStatement,
     LetBinding,
@@ -94,7 +94,7 @@ class ExecutionEngine:
         if isinstance(expr, Literal):
             return expr.value
         # For identifiers that reference previous scalar lets
-        from adxlite.parser.ast_nodes import Identifier, BinaryOp, UnaryOp
+        from adxpandas.parser.ast_nodes import Identifier, BinaryOp, UnaryOp
         if isinstance(expr, Identifier):
             if expr.name in existing:
                 return existing[expr.name]
@@ -129,7 +129,7 @@ class ExecutionEngine:
 
     def _eval_scalar_expr(self, expr: object, scalars: dict[str, object]) -> object:
         """Recursively evaluate a scalar expression."""
-        from adxlite.parser.ast_nodes import Identifier, BinaryOp, UnaryOp
+        from adxpandas.parser.ast_nodes import Identifier, BinaryOp, UnaryOp
         if isinstance(expr, Literal):
             return expr.value
         if isinstance(expr, Identifier):

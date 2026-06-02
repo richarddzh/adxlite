@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from adxlite.parser.ast_nodes import (
+from adxpandas.parser.ast_nodes import (
     BinaryOp,
     CountOp,
     DistinctOp,

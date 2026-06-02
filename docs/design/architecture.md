@@ -2,6 +2,37 @@
 
 This document explains how AdxLite is structured internally and how a KQL statement moves from raw text to a pandas DataFrame result. The focus is on implementation architecture rather than user-facing syntax. For public API usage, see [API reference](../reference/api.md). For language details, see [KQL syntax](../reference/kql-syntax.md), [Operators](../reference/operators.md), and [Functions](../reference/functions.md).
 
+## Monorepo structure
+
+The repository contains two Python packages:
+
+- **adxpandas** — standalone KQL-over-pandas execution (no database)
+- **adxlite** — SQLite-backed KQL execution (depends on adxpandas)
+
+```text
+repo_root/
+├── adxpandas/              # Sub-project: pure pandas KQL engine
+│   ├── pyproject.toml
+│   ├── src/adxpandas/
+│   │   ├── parser/         # Shared KQL parser (tokenizer, AST, parser)
+│   │   ├── engine/         # Pandas execution engine
+│   │   ├── functions.py    # Pure-Python KQL function implementations
+│   │   ├── client.py       # AdxPandasClient API
+│   │   └── exceptions.py   # Base exceptions
+│   └── tests/
+├── src/adxlite/            # Main project: SQLite-backed KQL engine
+│   ├── parser/             # Shim modules re-exporting from adxpandas
+│   ├── engine/             # SQLite+pandas hybrid execution
+│   ├── translator/         # AST-to-SQL translation (SQLite-specific)
+│   ├── storage/            # SQLite database layer
+│   ├── client.py           # AdxLiteClient API
+│   └── exceptions.py       # Re-exports + SQLite-specific exceptions
+├── tests/                  # adxlite tests
+├── docs/                   # Shared documentation
+├── pyproject.toml          # adxlite project config
+└── mkdocs.yml
+```
+
 ## Architectural goals
 
 AdxLite is built around a small set of goals:

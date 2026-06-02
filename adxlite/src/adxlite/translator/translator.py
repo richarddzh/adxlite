@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from adxlite.exceptions import KqlUnsupportedError, TranslationError
-from adxlite.parser.ast_nodes import (
+from adxpandas.parser.ast_nodes import (
     BetweenExpr,
     BinaryOp,
     CountOp,

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Build documentation as static HTML into site/ directory
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$Root = Split-Path -Parent $PSScriptRoot
 
 Push-Location $Root
 try {

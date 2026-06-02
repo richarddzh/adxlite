@@ -13,6 +13,7 @@ if [ -d ".venv" ]; then
     rm -rf .venv
 fi
 
-rm -rf src/adxlite.egg-info *.egg-info
+rm -rf adxpandas/src/adxpandas.egg-info adxpandas/dist
+rm -rf adxlite/src/adxlite.egg-info adxlite/dist
 
 echo "Clean complete."

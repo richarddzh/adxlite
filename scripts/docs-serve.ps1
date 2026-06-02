@@ -3,7 +3,7 @@
 # Access at http://127.0.0.1:8000/
 
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$Root = Split-Path -Parent $PSScriptRoot
 
 Push-Location $Root
 try {

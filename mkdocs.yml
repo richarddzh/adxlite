@@ -57,6 +57,8 @@ nav:
       - Quickstart: guides/quickstart.md
       - Data Ingestion: guides/ingestion.md
       - Advanced Queries: guides/advanced-queries.md
+  - adxpandas:
+      - Overview: adxpandas/index.md
   - Design:
       - Architecture: design/architecture.md
       - Design Decisions: design/decisions.md
