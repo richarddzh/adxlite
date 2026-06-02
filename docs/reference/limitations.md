@@ -8,20 +8,29 @@ For supported syntax, see [KQL syntax](kql-syntax.md). For design rationale, see
 
 AdxLite is intentionally narrow. It aims to be a reliable, well-tested local analytics tool for Python developers, not a full Azure Data Explorer replacement. Many limitations are therefore deliberate scope choices rather than accidental gaps.
 
+## Supported operators with known limitations
+
+These operators are implemented but have specific constraints compared to full Kusto:
+
+| Operator | Limitation | Detail |
+| --- | --- | --- |
+| `let` | Function let (lambdas) unsupported | Only scalar values and tabular sub-queries; build reusable logic in Python |
+| `join` | `innerunique` approximated as `inner` in SQL path | Pandas fallback provides true right-side dedup |
+| `join` | `fullouter` and `rightouter` always use pandas | SQLite lacks FULL OUTER JOIN; these are routed to pandas execution |
+| `union` | Wildcard syntax (`union T*`) unsupported | List table names explicitly |
+| `union` | Mismatched schemas route to pandas | SQL UNION ALL requires identical column counts; pandas fills missing columns with NaN |
+
 ## Unsupported KQL tabular operators
 
-The parser explicitly treats several KQL operators as unsupported.
+The following operators are not implemented and will raise `KqlUnsupportedError`:
 
-| Operator | Status | Why unsupported right now | Typical workaround |
-| --- | --- | --- | --- |
-| `join` | **supported** | All 9 join kinds are supported | — |
-| `union` | **supported** | Source and pipe forms, kind=inner/outer, withsource | — |
-| `let` | **partially supported** | Scalar and tabular let; function let unsupported | Build queries in Python strings for function-like reuse |
-| `mv-expand` | unsupported | Needs array/dynamic expansion semantics not present in the current dynamic model | deserialize JSON in Python and re-ingest flattened rows |
-| `mv-apply` | unsupported | Depends on dynamic expansion plus subquery semantics | perform the logic in pandas before ingestion |
-| `render` | unsupported | Visualization is outside the scope of a local query engine | use pandas plotting or notebook/charting tools after query execution |
-| `invoke` | unsupported | Depends on stored-function or function-object semantics not present in the engine | call Python helpers around queries instead |
-| `evaluate` | unsupported | Opens a broad plugin/operator surface outside the current execution model | perform custom post-processing in Python |
+| Operator | Why unsupported | Typical workaround |
+| --- | --- | --- |
+| `mv-expand` | Needs array/dynamic expansion semantics not present in the current dynamic model | Deserialize JSON in Python and re-ingest flattened rows |
+| `mv-apply` | Depends on dynamic expansion plus subquery semantics | Perform the logic in pandas before ingestion |
+| `render` | Visualization is outside the scope of a local query engine | Use pandas plotting or notebook/charting tools after query execution |
+| `invoke` | Depends on stored-function or function-object semantics not present in the engine | Call Python helpers around queries instead |
+| `evaluate` | Opens a broad plugin/operator surface outside the current execution model | Perform custom post-processing in Python |
 
 ## Unsupported or missing expression/operator forms
 
@@ -33,9 +42,6 @@ Even within supported categories, some KQL spellings are intentionally absent.
 | `!has` | not parsed as a dedicated token | use `not (col has "x")` |
 | `!in` | not parsed as a dedicated token | use `not in (...)` |
 | `!between` | not parsed as a dedicated token | use `not between (...)` |
-| function `let` (lambdas) | unsupported | define logic in Python and compose query strings |
-| wildcard union (`union T*`) | unsupported | list table names explicitly |
-| `innerunique` true dedup | approximated as `inner` in SQL path | pandas fallback provides true dedup |
 
 ## Unsupported KQL function surface
 
