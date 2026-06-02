@@ -377,7 +377,7 @@ class PandasOperatorExecutor:
         right_source = operator.right.source.name
         from adxlite.storage import Database
         db: Database = self._database
-        schema = db.get_schema(right_source) if db.table_exists(right_source) else {}
+        schema = db.get_schema(right_source)
         right_df = db.query_dataframe(f"SELECT * FROM [{right_source}]", [], schema)
 
         # Apply right-side pipeline operators if any
@@ -450,7 +450,7 @@ class PandasOperatorExecutor:
 
         frames = [dataframe]
         for table_name in operator.tables:
-            schema = db.get_schema(table_name) if db.table_exists(table_name) else {}
+            schema = db.get_schema(table_name)
             df = db.query_dataframe(f"SELECT * FROM [{table_name}]", [], schema)
             if operator.withsource:
                 df.insert(0, operator.withsource, table_name)

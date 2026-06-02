@@ -329,9 +329,10 @@ Raised when syntax is recognized but intentionally unsupported.
 
 Typical causes:
 
-- unsupported operators such as `join`
+- unsupported operators such as `mv-expand`, `mv-apply`, `render`, `invoke`, `evaluate`
 - unsupported functions
 - unsupported management commands other than `.append`
+- function `let` (lambda definitions with parameters)
 
 ## `TableNotFoundError`
 

@@ -278,7 +278,7 @@ These helpers are useful when you are building tooling on top of AdxLite or vali
 
 ### Forgetting that AdxLite supports a subset of KQL
 
-If a query uses operators such as `join` or `union`, AdxLite raises `KqlUnsupportedError`. Check [limitations](../reference/limitations.md) before assuming full Azure Data Explorer compatibility.
+AdxLite supports `let`, `union`, and `join`, but operators such as `mv-expand`, `mv-apply`, and `render` raise `KqlUnsupportedError`. Check [limitations](../reference/limitations.md) before assuming full Azure Data Explorer compatibility.
 
 ### Assuming the database is remote
 

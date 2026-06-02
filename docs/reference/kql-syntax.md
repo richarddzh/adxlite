@@ -82,9 +82,9 @@ Events
 
 ### Rules
 
-- the source must be a single table name
-- subqueries as source expressions are not supported
-- multiple source tables in one statement are not supported
+- the source can be a single table name, or a `union` source form
+- `let` bindings can precede the pipeline to define reusable names
+- `join` sub-pipelines are written as `(TableName | operators...)`
 - bracketed identifiers allow spaces or punctuation in names
 
 ## Pipe operator syntax
@@ -410,14 +410,18 @@ These operators are translated through SQLite `LIKE` in the SQL path. SQLite's e
 
 The parser deliberately rejects or marks unsupported several major KQL categories, including:
 
-- `join`
-- `union`
 - `mv-expand`
 - `mv-apply`
 - `render`
-- `let`
 - `invoke`
 - `evaluate`
+- function `let` (lambda definitions with parameters)
+
+The following were previously unsupported but are now implemented:
+
+- `let` (scalar and tabular bindings)
+- `union` (source form and pipe form)
+- `join` (all 9 Kusto join kinds)
 
 See [Limitations](limitations.md) for the full discussion.
 

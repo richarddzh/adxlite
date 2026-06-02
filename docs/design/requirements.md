@@ -137,13 +137,14 @@ AdxLite must not support multi-database relational composition such as cross-dat
 
 Expected behavior:
 
-- unsupported operators such as `join` and `union` should raise `KqlUnsupportedError`
-- documentation must state that the supported model is a single local database with single-table pipelines
+- cross-database references (e.g., `database("other").Table`) should raise an error
+- all tables in `join` and `union` must exist in the same local database
+- documentation must state that the supported model is a single local database
 
 Validation ideas:
 
-- parse or query a statement containing `join` or `union`
-- confirm an unsupported-error path is triggered
+- join or union a table that does not exist in the local database
+- confirm a `TableNotFoundError` is raised
 
 ## FR-08: `parse` operator support
 

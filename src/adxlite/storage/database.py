@@ -99,6 +99,12 @@ class Database:
             cursor = self._connection.execute(sql, tuple(params or ()))
             rows = cursor.fetchall()
         except sqlite3.Error as exc:
+            msg = str(exc)
+            if "no such table" in msg:
+                table_name = msg.replace("no such table: ", "")
+                raise TableNotFoundError(
+                    f"Table '{table_name}' does not exist"
+                ) from exc
             raise ExecutionError(f"SQLite execution failed: {exc}") from exc
         dataframe = pd.DataFrame([dict(row) for row in rows], columns=[col[0] for col in cursor.description or []])
         if result_schema:

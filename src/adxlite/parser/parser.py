@@ -496,7 +496,15 @@ class Parser:
             expr = self._parse_expression()
             self._expect(TokenType.RPAREN, "Expected ')' after expression")
             return expr
-        raise KqlParseError(f"Unexpected token '{token.value}' at position {token.position}")
+        if token.type == TokenType.EOF:
+            raise KqlParseError(
+                "Unexpected end of query — expected an expression. "
+                "Check that operators like 'where', 'extend', or 'project' are followed by a valid expression."
+            )
+        raise KqlParseError(
+            f"Unexpected token '{token.value}' at position {token.position}. "
+            f"Expected an expression (column name, literal, or function call)."
+        )
 
     def _finish_datetime_literal(self) -> Literal:
         """Collect tokens inside datetime(...) as a date/time string literal."""

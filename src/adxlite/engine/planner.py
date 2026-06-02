@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from adxlite.exceptions import TableNotFoundError
 from adxlite.parser.ast_nodes import (
     BinaryOp,
     CountOp,
@@ -48,8 +47,6 @@ class Planner:
 
     def plan(self, pipeline: Pipeline) -> ExecutionPlan:
         """Plan a pipeline for execution."""
-        if not self._database.table_exists(pipeline.source.name):
-            raise TableNotFoundError(f"Table '{pipeline.source.name}' does not exist")
         current_schema = self._database.get_schema(pipeline.source.name)
         sql_ops: list[Operator] = []
         pandas_ops: list[Operator] = []
@@ -91,9 +88,9 @@ class Planner:
         # when union includes tables with different column counts
         schemas: list[set[str]] = []
         for table_name in operator.tables:
-            if self._database.table_exists(table_name):
+            try:
                 schemas.append(set(self._database.get_schema(table_name).keys()))
-            else:
+            except Exception:
                 return False
         if not schemas:
             return True
@@ -144,19 +141,23 @@ class Planner:
             # For union, merge schemas from all tables (outer = all columns)
             result = dict(schema)
             for table_name in operator.tables:
-                if self._database.table_exists(table_name):
+                try:
                     other_schema = self._database.get_schema(table_name)
-                    if operator.kind == "outer":
-                        for col, typ in other_schema.items():
-                            if col not in result:
-                                result[col] = typ
-                    # inner: keep only common cols (handled after all tables)
+                except Exception:
+                    continue
+                if operator.kind == "outer":
+                    for col, typ in other_schema.items():
+                        if col not in result:
+                            result[col] = typ
+                # inner: keep only common cols (handled after all tables)
             if operator.kind == "inner":
                 common_cols = set(schema.keys())
                 for table_name in operator.tables:
-                    if self._database.table_exists(table_name):
+                    try:
                         other_schema = self._database.get_schema(table_name)
                         common_cols &= set(other_schema.keys())
+                    except Exception:
+                        pass
                 result = {k: v for k, v in schema.items() if k in common_cols}
             if operator.withsource:
                 result = {operator.withsource: "string", **result}
@@ -166,9 +167,9 @@ class Planner:
             result = dict(schema)
             # Get right schema by inferring from the right pipeline source
             right_source = operator.right.source.name
-            if self._database.table_exists(right_source):
+            try:
                 right_schema = self._database.get_schema(right_source)
-            else:
+            except Exception:
                 right_schema = {}
 
             # For anti/semi joins, only keep one side

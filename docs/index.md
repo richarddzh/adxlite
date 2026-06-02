@@ -93,7 +93,7 @@ AdxLite supports:
 
 - local SQLite database files and in-memory databases
 - DataFrame ingestion and query results as pandas DataFrames
-- a single-table KQL pipeline model
+- KQL pipelines with `let`, `union`, `join`, and standard tabular operators
 - aggregate functions, string helpers, datetime helpers, and JSON helpers
 - `datetime(...)` literals and ISO-8601 datetime storage
 - `.append TableName <| query`

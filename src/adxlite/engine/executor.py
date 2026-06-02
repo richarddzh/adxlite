@@ -89,6 +89,7 @@ class ExecutionEngine:
 
     def _evaluate_scalar_let(self, binding: LetBinding, existing: dict[str, object]) -> object:
         """Evaluate a scalar let binding to a Python value."""
+        from adxlite.exceptions import ExecutionError
         expr = binding.value
         if isinstance(expr, Literal):
             return expr.value
@@ -97,7 +98,11 @@ class ExecutionEngine:
         if isinstance(expr, Identifier):
             if expr.name in existing:
                 return existing[expr.name]
-            raise ValueError(f"Undefined let reference '{expr.name}'")
+            raise ExecutionError(
+                f"Undefined reference '{expr.name}' in let binding '{binding.name}'. "
+                f"Only previously defined let variables can be referenced. "
+                f"Defined variables: {', '.join(existing.keys()) if existing else '(none)'}"
+            )
         # Simple arithmetic on literals
         if isinstance(expr, BinaryOp):
             left = self._eval_scalar_expr(expr.left, existing)
@@ -116,7 +121,11 @@ class ExecutionEngine:
         # Fallback: try to use it as-is
         if isinstance(expr, Literal):
             return expr.value
-        raise ValueError(f"Cannot evaluate scalar let expression for '{binding.name}'")
+        raise ExecutionError(
+            f"Cannot evaluate scalar let expression for '{binding.name}'. "
+            f"Scalar let values must be literals (numbers, strings) or simple arithmetic expressions. "
+            f"For complex expressions, use a tabular let instead: let {binding.name} = TableName | ..."
+        )
 
     def _eval_scalar_expr(self, expr: object, scalars: dict[str, object]) -> object:
         """Recursively evaluate a scalar expression."""
@@ -151,7 +160,7 @@ class ExecutionEngine:
         frames: list[pd.DataFrame] = []
         for table_name in union.tables:
             sql = f"SELECT * FROM [{table_name}]"
-            schema = self._database.get_schema(table_name) if self._database.table_exists(table_name) else {}
+            schema = self._database.get_schema(table_name)
             df = self._database.query_dataframe(sql, [], schema)
             if union.withsource:
                 df.insert(0, union.withsource, table_name)
