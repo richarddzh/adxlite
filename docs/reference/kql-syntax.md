@@ -6,11 +6,14 @@ If you want guided examples, see [Quickstart](../guides/quickstart.md) and [Adva
 
 ## Scope of this syntax
 
-AdxLite supports a single-table, pipeline-oriented subset of KQL. The grammar is intentionally smaller than full Kusto, but the supported surface is designed to be readable and useful for local analytics.
+AdxLite supports a multi-table, pipeline-oriented subset of KQL. The grammar is intentionally smaller than full Kusto, but the supported surface is designed to be readable and useful for local analytics.
 
 Main constructs supported today:
 
+- `let` bindings (scalar values and tabular sub-queries)
 - source table references
+- `union` (source form and pipe form)
+- `join` (all 9 Kusto join kinds with sub-pipelines)
 - pipe-delimited tabular operators
 - arithmetic, comparison, logical, and function-call expressions
 - string, number, boolean, datetime, and timespan literals
@@ -21,10 +24,17 @@ Main constructs supported today:
 The following grammar is descriptive rather than machine-generated, but it closely matches the implemented parser.
 
 ```text
-statement        := append_command | pipeline
+statement        := append_command | kql_statement
+kql_statement    := let_binding* body
+let_binding      := 'let' identifier '=' (expression | pipeline) ';'
+body             := append_command | union_source | pipeline
 append_command   := '.' 'append' identifier '<|' pipeline
+union_source     := 'union' union_params table_list ('|' operator)*
 pipeline         := table_ref ('|' operator)*
 table_ref        := identifier
+
+union_params     := ('kind' '=' ('inner' | 'outer'))? ('withsource' '=' identifier)?
+table_list       := identifier (',' identifier)*
 
 operator         := where_op
                   | project_op
@@ -37,6 +47,15 @@ operator         := where_op
                   | top_op
                   | distinct_op
                   | parse_op
+                  | union_op
+                  | join_op
+
+union_op         := 'union' union_params table_list
+join_op          := 'join' ('kind' '=' join_kind)? '(' pipeline ')' 'on' join_conditions
+join_kind        := 'inner' | 'innerunique' | 'leftouter' | 'rightouter'
+                  | 'fullouter' | 'leftanti' | 'leftsemi' | 'rightanti' | 'rightsemi'
+join_conditions  := join_condition (',' join_condition)*
+join_condition   := identifier | '$left' '.' identifier '==' '$right' '.' identifier
 
 where_op         := 'where' expression
 project_op       := 'project' named_expr (',' named_expr)*

@@ -33,8 +33,9 @@ Even within supported categories, some KQL spellings are intentionally absent.
 | `!has` | not parsed as a dedicated token | use `not (col has "x")` |
 | `!in` | not parsed as a dedicated token | use `not in (...)` |
 | `!between` | not parsed as a dedicated token | use `not between (...)` |
-| multi-table sources | unsupported | ingest a combined table first |
-| subquery table expressions | unsupported | stage intermediate results in Python or with `.append` |
+| function `let` (lambdas) | unsupported | define logic in Python and compose query strings |
+| wildcard union (`union T*`) | unsupported | list table names explicitly |
+| `innerunique` true dedup | approximated as `inner` in SQL path | pandas fallback provides true dedup |
 
 ## Unsupported KQL function surface
 

@@ -16,6 +16,9 @@ In this project, advanced queries usually involve one or more of the following:
 - JSON parsing and extraction
 - grouped aggregation
 - conditional expressions
+- `let` bindings for named sub-expressions
+- `union` for combining tables with compatible schemas
+- `join` for correlating tables by key columns
 - `.append` for materializing query results locally
 
 ## Pattern: build pipelines incrementally
@@ -399,6 +402,109 @@ This example shows the intended style of the engine:
 - pandas handles `parse`
 - JSON helpers and conversions make semi-structured payloads usable
 - the final result is a normal pandas DataFrame
+
+## Pattern: scalar let for reusable thresholds
+
+Use `let` to define a scalar constant and reference it across the pipeline.
+
+```kql
+let threshold = 100;
+Events
+| where value > threshold
+| summarize cnt = count() by city
+```
+
+## Pattern: tabular let for intermediate results
+
+Define a named sub-query with `let` and reference it as a table later.
+
+```kql
+let HighValue = Events | where value > 100;
+HighValue
+| summarize total = sum(value) by city
+```
+
+## Pattern: combine tables with union
+
+Use source-form union to query across multiple tables:
+
+```kql
+union Events, Logs
+| where ts > ago(1d)
+| summarize cnt = count() by source_table = $table
+```
+
+Use `withsource` to add a column that identifies which table each row came from:
+
+```kql
+union withsource=origin Events, Logs
+| summarize cnt = count() by origin
+```
+
+Pipe-form union appends another table inside a pipeline:
+
+```kql
+Events
+| union Logs
+| where city == "London"
+```
+
+## Pattern: correlate tables with join
+
+Inner join matches rows from two tables on a key:
+
+```kql
+Events
+| join kind=inner (Users) on user
+| project user, city, email
+```
+
+Left outer join keeps all rows from the left, filling NaN for unmatched right columns:
+
+```kql
+Events
+| join kind=leftouter (Users) on user
+| project user, city, email
+```
+
+Left anti join finds rows in the left table with no match in the right:
+
+```kql
+Events
+| join kind=leftanti (Users) on user
+| project user, city
+```
+
+### Qualified key columns
+
+When the join keys have different names in each table, use `$left` and `$right`:
+
+```kql
+Events
+| join kind=inner (Users) on $left.user_id == $right.id
+| project user_id, city, email
+```
+
+### Join with sub-pipeline
+
+The right side of a join can be a full pipeline:
+
+```kql
+Events
+| join kind=inner (Users | where active == true) on user
+| project user, city
+```
+
+## Pattern: combine let with join
+
+Use `let` to define the right-side table, then join against it:
+
+```kql
+let ActiveUsers = Users | where active == true;
+Events
+| join kind=inner (ActiveUsers) on user
+| project user, city, email
+```
 
 ## Related documents
 

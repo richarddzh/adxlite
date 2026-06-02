@@ -54,6 +54,9 @@ AdxLite focuses on a coherent, well-documented subset of KQL rather than trying 
 - `top`
 - `distinct`
 - `parse`
+- `let` (scalar and tabular bindings)
+- `union` (source form and pipe form)
+- `join` (all 9 Kusto join kinds)
 
 ### Supported scalar and aggregate capabilities
 
@@ -137,14 +140,15 @@ AdxLite is intentionally narrower than Azure Data Explorer. The project supports
 | Area | Supported |
 | --- | --- |
 | Data source | Local SQLite tables created from pandas DataFrames |
-| Query shape | Single-table KQL pipelines |
+| Query shape | KQL pipelines with `let`, `union`, and `join` |
 | Table mutation | `.append TableName <| query` |
 | Datetime literals | `datetime(2024-01-02)` |
 | Timespans | `1d`, `12h`, `30m`, `5s`, `100ms` |
 | Result type | `pandas.DataFrame` |
 | Advanced parsing | `parse` with pandas post-processing |
+| Multi-table | `union T1, T2` and `join kind=X (T) on key` |
 
-Unsupported categories include `join`, `union`, `mv-expand`, `mv-apply`, `render`, `let`, `invoke`, and `evaluate`. See [docs/reference/limitations.md](docs/reference/limitations.md) for details and workarounds.
+Unsupported categories include `mv-expand`, `mv-apply`, `render`, `invoke`, and `evaluate`. Function `let` (lambda definitions) is also unsupported. See [docs/reference/limitations.md](docs/reference/limitations.md) for details and workarounds.
 
 ## Documentation map
 

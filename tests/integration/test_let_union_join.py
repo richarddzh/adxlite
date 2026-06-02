@@ -194,3 +194,56 @@ class TestJoinFollowedByOps:
     def test_join_then_summarize(self, client):
         r = client.query("users | join kind=inner (orders) on name | summarize total = sum(amount) by name")
         assert len(r) == 2  # alice and bob
+
+
+# ============ EDGE CASE TESTS ============
+
+
+class TestEdgeCases:
+    def test_join_empty_right(self, client):
+        """Join against empty table returns no rows for inner."""
+        client.ingest("empty_t", pd.DataFrame({"id": pd.Series(dtype="int64"), "val": pd.Series(dtype="str")}))
+        r = client.query("left_t | join kind=inner (empty_t) on id")
+        assert len(r) == 0
+
+    def test_union_empty_table(self, client):
+        """Union with empty table still returns rows from non-empty table."""
+        client.ingest("empty_logs", pd.DataFrame({"msg": pd.Series(dtype="str"), "level": pd.Series(dtype="int64")}))
+        r = client.query("union logs1, empty_logs")
+        assert len(r) == 2
+
+    def test_let_referencing_another_let(self, client):
+        """Tabular let followed by tabular let referencing the first."""
+        r = client.query('let eng = users | where dept == "eng"; let young_eng = eng | where age < 30; young_eng | count')
+        assert r.iloc[0, 0] == 1  # bob
+
+    def test_join_with_null_keys(self, client):
+        """Rows with NULL keys should not match."""
+        import numpy as np
+        client.ingest("lnull", pd.DataFrame({"key": [1, None, 3], "a": ["x", "y", "z"]}))
+        client.ingest("rnull", pd.DataFrame({"key": [None, 2, 3], "b": ["p", "q", "r"]}))
+        r = client.query("lnull | join kind=inner (rnull) on key")
+        # Only key=3 matches (NULLs never join)
+        assert len(r) == 1
+        assert r.iloc[0]["a"] == "z"
+
+    def test_undefined_table_in_join_errors(self, client):
+        """Joining against non-existent table should error."""
+        with pytest.raises(Exception):
+            client.query("users | join kind=inner (no_such_table) on name")
+
+    def test_undefined_let_as_table_errors(self, client):
+        """Using undefined let as table source should error."""
+        with pytest.raises(Exception):
+            client.query("let x = 42; undefined_table | where col > x")
+
+    def test_leftanti_empty_result(self, client):
+        """leftanti when all left rows have matches returns empty."""
+        client.ingest("all_match_l", pd.DataFrame({"id": [2, 3]}))
+        r = client.query("all_match_l | join kind=leftanti (right_t) on id")
+        assert len(r) == 0
+
+    def test_union_three_tables_source(self, client):
+        """Union three tables in source form."""
+        r = client.query("union logs1, logs2, logs3")
+        assert len(r) == 5  # 2 + 2 + 1
