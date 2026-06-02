@@ -213,3 +213,7 @@ adxpandas consists of:
 - **Engine** — pandas-native execution of KQL operators
   - `PandasOperatorExecutor` — applies individual operators to DataFrames
   - `PandasExecutionEngine` — orchestrates full query execution including `let` bindings, unions, and joins
+
+## Acknowledgments
+
+Some functionality in adxpandas was inspired by and references [KustoPandas](https://github.com/js850/KustoPandas). We thank the KustoPandas authors for their pioneering work on KQL-over-pandas execution.

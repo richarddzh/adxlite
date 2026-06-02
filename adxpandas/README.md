@@ -86,8 +86,16 @@ w.execute('self | summarize avg(score) by city | render barchart')
 
 See the [full documentation](https://richarddzh.github.io/adxlite/) for comprehensive guides covering both adxlite and adxpandas.
 
+## Acknowledgments
+
+Some functionality in adxpandas was inspired by and references [KustoPandas](https://github.com/js850/KustoPandas). We thank the KustoPandas authors for their pioneering work on KQL-over-pandas execution.
+
 ## Links
 
 - [GitHub Repository](https://github.com/richarddzh/adxlite)
 - [Documentation](https://richarddzh.github.io/adxlite/)
 - [Issue Tracker](https://github.com/richarddzh/adxlite/issues)
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](../LICENSE) file for details.
