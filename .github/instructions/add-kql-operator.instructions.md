@@ -1,6 +1,6 @@
 ---
-name: add-kql-operator
-description: Use this skill when implementing a new KQL tabular operator. Covers AST nodes, tokenizer, parser, pandas engine, SQL translation, and testing.
+description: "Use when implementing a new KQL tabular operator. Covers AST nodes, tokenizer, parser, pandas engine, SQL translation, and testing."
+applyTo: "**/parser/**,**/engine/**"
 ---
 
 # Skill: Adding a New KQL Operator

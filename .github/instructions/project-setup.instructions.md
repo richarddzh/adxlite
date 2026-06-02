@@ -1,6 +1,6 @@
 ---
-name: project-setup
-description: Use this skill when setting up the development environment, installing dependencies, or troubleshooting build issues in the adxlite monorepo.
+description: "Use when setting up the development environment, installing dependencies, or troubleshooting build issues in the adxlite monorepo."
+applyTo: "**/pyproject.toml,**/README.md"
 ---
 
 # Skill: Project Setup and Build

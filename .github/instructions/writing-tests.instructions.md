@@ -1,6 +1,6 @@
 ---
-name: writing-tests
-description: Use this skill when writing or debugging tests for adxpandas or adxlite. Covers test structure, pandas version compatibility, and known pitfalls.
+description: "Use when writing or debugging tests for adxpandas or adxlite. Covers test structure, pandas version compatibility, and known pitfalls."
+applyTo: "**/tests/**"
 ---
 
 # Skill: Writing Tests for adxpandas / adxlite
