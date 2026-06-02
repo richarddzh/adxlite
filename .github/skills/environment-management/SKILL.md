@@ -1,6 +1,6 @@
 ---
+name: "environment-management"
 description: "Use when adding or removing dependencies, updating Python version, or troubleshooting environment issues."
-applyTo: "**/pyproject.toml,**/.github/workflows/**"
 ---
 
 # Skill: Environment and Dependency Management

@@ -1,6 +1,6 @@
 ---
+name: "add-kql-function"
 description: "Use when implementing a new KQL scalar or aggregation function. Covers function implementation, UDF registration, null handling, and edge cases."
-applyTo: "**/functions.py,**/aggregates.py"
 ---
 
 # Skill: Adding a New KQL Function

@@ -1,6 +1,6 @@
 ---
+name: "debugging-kql-translation"
 description: "Use when debugging KQL query failures, parse errors, or runtime exceptions. Covers token inspection, AST debugging, and known issues."
-applyTo: "**/parser/**,**/engine/**,**/translator/**"
 ---
 
 # Skill: Debugging KQL Translation Issues
