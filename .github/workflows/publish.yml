@@ -12,16 +12,25 @@ jobs:
   test-gate:
     uses: ./.github/workflows/tests.yml
 
-  docs-gate:
+  docs-check:
     needs: test-gate
-    uses: ./.github/workflows/docs.yml
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install MkDocs
+        run: pip install mkdocs mkdocs-material
+
+      - name: Verify docs build
+        run: mkdocs build --strict
 
   build:
-    needs: [test-gate, docs-gate]
+    needs: [test-gate, docs-check]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
