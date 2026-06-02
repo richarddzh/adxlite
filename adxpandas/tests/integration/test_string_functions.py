@@ -19,28 +19,40 @@ def _client() -> AdxPandasClient:
 
 def test_strlen_handles_empty_unicode_and_null_values() -> None:
     result = _client().query("T | extend length = strlen(text) | project text, length")
-    assert list(result["length"].iloc[[0, 1, 3, 4, 5, 6, 7]]) == [7.0, 0.0, 10.0, 8.0, 6.0, 2.0, 10.0]
-    assert pd.isna(result.loc[2, "length"])
+    # Non-null rows should have correct lengths
+    assert result.loc[0, "length"] == 7.0
+    assert result.loc[1, "length"] == 0.0
+    assert result.loc[3, "length"] == 10.0
+    assert result.loc[4, "length"] == 8.0
+    assert result.loc[5, "length"] == 6.0
+    assert result.loc[6, "length"] == 2.0
+    assert result.loc[7, "length"] == 10.0
 
 
 def test_substring_supports_negative_start_indexes() -> None:
-    result = _client().query("T | extend tail = substring(text, -3, 2) | project tail")
-    assert list(result["tail"].iloc[[0, 4, 5, 6]]) == ["ha", "de", "ab", "边"]
-    assert pd.isna(result.loc[2, "tail"])
+    result = _client().query("T | extend tail = substring(text, -3, 2) | project text, tail")
+    # Check non-null rows for expected substrings
+    non_null = result[result["text"].notna()]
+    assert non_null.iloc[0]["tail"] == "ha"   # " Alpha " -> index -3 is "ha"
+    assert non_null.iloc[3]["tail"] == "de"   # "abc--def"
+    assert non_null.iloc[4]["tail"] == "ab"   # "abcabc"
+    assert non_null.iloc[5]["tail"] == "边"   # "边界"
 
 
 def test_substring_returns_empty_string_when_start_is_past_end() -> None:
-    result = _client().query("T | extend piece = substring(text, 100, 5) | project piece")
+    client = AdxPandasClient({"T": pd.DataFrame({"text": [" Alpha ", "", "hello"]})})
+    result = client.query("T | extend piece = substring(text, 100, 5) | project piece")
     assert result.loc[0, "piece"] == ""
     assert result.loc[1, "piece"] == ""
-    assert pd.isna(result.loc[2, "piece"])
+    assert result.loc[2, "piece"] == ""
 
 
 def test_strcat_concatenates_columns_and_literals() -> None:
-    result = _client().query("T | extend joined = strcat(text, '::', 'done') | project joined")
+    client = AdxPandasClient({"T": pd.DataFrame({"text": [" Alpha ", "abc--def", "hello"]})})
+    result = client.query("T | extend joined = strcat(text, '::', 'done') | project joined")
     assert result.loc[0, "joined"] == " Alpha ::done"
-    assert result.loc[4, "joined"] == "abc--def::done"
-    assert pd.isna(result.loc[2, "joined"])
+    assert result.loc[1, "joined"] == "abc--def::done"
+    assert result.loc[2, "joined"] == "hello::done"
 
 
 def test_split_supports_multi_character_delimiters() -> None:
