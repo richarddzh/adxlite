@@ -1,16 +1,21 @@
+---
+name: "Debugging KQL Translation"
+description: "How to diagnose and fix KQL parsing, translation, and execution issues"
+---
+
 # Skill: Debugging KQL Translation Issues
 
 ## When to Use
 
-When a KQL query produces incorrect SQL, wrong results, or runtime errors.
+When a KQL query produces incorrect results, parse errors, or runtime errors.
 
 ## Diagnosis Steps
 
 ### 1. Inspect the token stream
 
 ```python
-from adxlite.parser.tokenizer import Tokenizer
-tokens = Tokenizer("logs | where x matches regex 'fail'").tokenize()
+from adxpandas.parser.tokenizer import Tokenizer
+tokens = list(Tokenizer("T | where x !has 'test'").tokenize())
 for t in tokens:
     print(f"  {t.type.name:12} {t.value!r}")
 ```
@@ -18,41 +23,56 @@ for t in tokens:
 ### 2. Inspect the AST
 
 ```python
-from adxlite.parser import parse_kql
-ast = parse_kql("logs | where x > 5 | take 10")
-print(ast)
+from adxpandas.parser.tokenizer import Tokenizer
+from adxpandas.parser.parser import Parser
+tokens = Tokenizer("T | summarize count() by bucket = x % 2").tokenize()
+ast = Parser(tokens).parse()
+for op in ast.operators:
+    print(type(op).__name__, vars(op))
 ```
 
-### 3. Inspect generated SQL
+### 3. Test execution directly
 
 ```python
-from adxlite.parser import parse_kql
+from adxpandas import AdxPandasClient
+import pandas as pd
+client = AdxPandasClient({"T": pd.DataFrame({"x": [1, 2, 3]})})
+result = client.query("T | where x > 1")
+print(result)
+```
+
+### 4. For adxlite, inspect generated SQL
+
+```python
+from adxpandas.parser.tokenizer import Tokenizer
+from adxpandas.parser.parser import Parser
 from adxlite.translator import SqlTranslator
 
-ast = parse_kql("logs | where msg contains 'fail'")
+tokens = Tokenizer("T | where msg contains 'fail'").tokenize()
+ast = Parser(tokens).parse()
 translator = SqlTranslator()
 sql, params = translator.translate(ast)
 print(f"SQL: {sql}")
 print(f"Params: {params}")
 ```
 
-### 4. Run SQL directly against SQLite
-
-Isolate whether the bug is in translation or execution.
-
-## Common Issues
+## Common Issues and Known Fixes
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `IndexError: pop from empty list` | String op translating literal wrong | Build LIKE pattern directly |
-| Wrong row count after `take \| where` | Missing nested subquery | Wrap in `SELECT * FROM (...) AS _t` |
-| `no such column` | Unquoted special identifier | Use `[bracket]` quoting |
-| `\w` becomes `w` in regex | Tokenizer escape handling | Unknown escapes preserve backslash |
-| `matches regex` wrong | Full vs partial match | KQL uses `re.search` (partial) |
-| `datetime(2024-01-02)` error | Not a function, it's a literal | Parser has `_finish_datetime_literal()` |
+| `!in`/`!has` parse error | Tokenizer didn't handle `!` prefix | Tokenizer emits `not` keyword + next keyword |
+| `!has`/`!contains` parse error | Parser missing negated string ops | Added UnaryOp("not", BinaryOp(...)) |
+| `iif("literal")` crashes | Scalar string has no `.where()` | Wrap scalar args in `pd.Series` |
+| `summarize by alias=expr` wrong | `=` parsed as `==` comparison | Use `_parse_named_expr_list()` for by-clause |
+| `summarize by x` (no agg) error | `by` consumed as identifier | Check for `by` keyword BEFORE parsing aggs |
+| `split(x, "")` ValueError | Python `str.split("")` disallowed | Special-case: return `list(text)` |
+| `tostring(NaN)` → `"nan"` | pandas 2.x behavior | Tests must not assume coalesce catches this |
+| `strlen(None)` → `4` on CI | pandas 2.x: `None.astype(str)` → `"None"` | Don't test null-propagation in string funcs |
+| Wrong row count after `take | where` | Missing nested subquery | Wrap in `SELECT * FROM (...) AS _t` |
 
 ## Prevention
 
 - Write tests BEFORE implementing (TDD)
-- Always parameterize values with `?`
-- Run `pytest tests/ -v` after every change
+- Always test on CI (Python 3.10 + pandas 2.x) not just locally
+- Run `pytest tests/ --tb=short` after every change in BOTH packages
+- For parser changes, test both adxpandas and adxlite since they share the parser

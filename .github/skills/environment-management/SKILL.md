@@ -1,3 +1,8 @@
+---
+name: "Environment Management"
+description: "Managing dependencies and virtual environment in the adxlite monorepo"
+---
+
 # Skill: Environment and Dependency Management
 
 ## When to Use

@@ -78,7 +78,13 @@ For significant design decisions:
 ### Running tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\ -v
+# adxpandas (from adxpandas directory)
+Set-Location Q:\gitroot\adxlite\adxpandas
+& Q:\gitroot\adxlite\.venv\Scripts\python.exe -m pytest tests/ --tb=short
+
+# adxlite (from adxlite directory)
+Set-Location Q:\gitroot\adxlite\adxlite
+& Q:\gitroot\adxlite\.venv\Scripts\python.exe -m pytest tests/ --tb=short
 ```
 
 ### Test standards
@@ -88,6 +94,23 @@ For significant design decisions:
 - Prefer deterministic assertions — use explicit `sort` before `take` in queries.
 - Test edge cases: empty tables, NULL values, error paths, boundary conditions.
 - Every new feature requires tests BEFORE the work is declared complete.
+- **One test file per feature area** — never use numeric suffixes like `_exhaustive2.py`.
+
+### CI Compatibility (CRITICAL)
+
+**CI uses Python 3.10 + pandas 2.x. Local dev typically uses Python 3.12 + pandas 3.x.**
+
+You MUST ensure tests pass in BOTH environments. Key differences:
+
+- `None` in object column `.astype(str)` → `"None"` (pandas 2.x) vs NaN (pandas 3.x)
+- `count()` after left join may be int64 or float64 depending on NaN presence
+- `tostring(integer)` → `"1"` vs `tostring(float)` → `"1.0"`
+
+**Rules:**
+1. Do NOT assert `pd.isna()` on string function results with null input
+2. Do NOT assert exact string representation of numeric counts — accept both forms
+3. Prefer filtering out nulls in test data rather than testing null propagation
+4. Always push and verify CI passes — local success is insufficient
 
 ### Coverage expectations
 
@@ -135,8 +158,14 @@ Scripts in `scripts/` provide reproducible developer workflows:
 
 ### GitHub Workflows
 
-- `.github/workflows/test.yml` — run tests on push/PR
+- `.github/workflows/test.yml` — run tests on push/PR (Python 3.10 + pandas 2.x)
 - `.github/workflows/publish.yml` — publish to PyPI on release tag
+
+### Releases
+
+- Bump version in BOTH `adxpandas/pyproject.toml` and `adxlite/pyproject.toml`
+- Use `gh release create vX.Y.Z --title "vX.Y.Z" --notes-file release_notes.md`
+- Always ensure CI passes BEFORE creating a release
 
 ### Commits
 

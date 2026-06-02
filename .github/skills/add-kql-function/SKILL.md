@@ -1,8 +1,13 @@
+---
+name: "Adding a KQL Function"
+description: "Step-by-step guide for implementing a new KQL scalar or aggregation function"
+---
+
 # Skill: Adding a New KQL Function
 
 ## When to Use
 
-When implementing a new KQL scalar or aggregation function in adxlite.
+When implementing a new KQL scalar or aggregation function.
 
 ## Steps
 
@@ -11,48 +16,47 @@ When implementing a new KQL scalar or aggregation function in adxlite.
 - **Aggregation**: Used inside `summarize` (e.g., `count()`, `sum()`, `dcount()`)
 - **Scalar**: Used in any expression context (e.g., `tolower()`, `extract()`, `now()`)
 
-### 2. Add to function registry
+### 2. Implement in adxpandas
 
-Edit `src/adxlite/translator/functions.py`:
-
-```python
-# In SCALAR_FUNCTIONS dict:
-"my_func": lambda args: f"kql_my_func({args[0]}, {args[1]})",
-
-# Or in AGG_FUNCTIONS dict for aggregations:
-"my_agg": lambda args: f"kql_my_agg({args[0]})",
-```
-
-### 3. Implement the UDF (if needed)
-
-If the function needs a SQLite UDF, add to `src/adxlite/storage/udf.py`:
+**For scalar functions**, add to `adxpandas/src/adxpandas/functions.py`:
 
 ```python
 def kql_my_func(arg1: Any, arg2: Any) -> Any:
     """Implements KQL my_func() semantics."""
-    if arg1 is None:
+    text = _safe_text(arg1)
+    if text is None:
         return None
     return result
 ```
 
-Then register it in `Database._register_udfs()` in `src/adxlite/storage/database.py`.
+Then register in `adxpandas/src/adxpandas/engine/pandas_ops.py` under `_evaluate_function()`.
 
-### 4. Add pandas fallback
+**For aggregations**, add handling in the `_evaluate_aggregation()` method.
 
-In `src/adxlite/engine/pandas_ops.py`, add handling in:
-- `_evaluate_function()` for direct pandas execution
-- Or `_map_rowwise()` mapping dict for UDF-based row-wise execution
+### 3. Implement in adxlite
+
+**For SQL-translatable functions**, add to `adxlite/src/adxlite/translator/functions.py`:
+
+```python
+"my_func": lambda args: f"kql_my_func({args[0]}, {args[1]})",
+```
+
+**If a SQLite UDF is needed**, add to `adxlite/src/adxlite/storage/udf.py` and register in `Database._register_udfs()`.
+
+**For pandas fallback**, add in `adxlite/src/adxlite/engine/pandas_ops.py`.
+
+### 4. Handle edge cases
+
+- **Empty delimiter in split**: Return `list(text)` (each character)
+- **Null inputs**: Always return None (use `_safe_text()` helper)
+- **Type coercion**: `tostring()` on NaN produces `"nan"` in pandas 2.x — tests must account for this
 
 ### 5. Write tests
 
-- Basic usage with NULL handling
-- Edge cases (empty string, zero, negative)
+- Basic usage with various inputs
+- Edge cases (empty string, zero, negative, None)
 - Combination with other operators in pipeline
-
-### 6. Update documentation
-
-- `docs/reference/functions.md`: signature, description, example
-- `.github/instructions.md`: supported functions list
+- Ensure tests work on pandas 2.x AND 3.x
 
 ## Rules
 
@@ -60,3 +64,4 @@ In `src/adxlite/engine/pandas_ops.py`, add handling in:
 - Always handle NULL inputs gracefully (return None)
 - Use `?` parameter placeholders for literal values in SQL
 - Validate argument count; raise `KqlParseError` for wrong arity
+- `iif`/`iff` must wrap scalar args in `pd.Series` before using `.where()`
