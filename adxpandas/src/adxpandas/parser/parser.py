@@ -25,6 +25,7 @@ from adxpandas.parser.ast_nodes import (
     ProjectAwayOp,
     ProjectOp,
     QualifiedIdentifier,
+    RenderOp,
     SortKey,
     SortOp,
     SummarizeOp,
@@ -207,6 +208,8 @@ class Parser:
             return self._parse_join()
         if keyword == "union":
             return self._parse_union_pipe()
+        if keyword == "render":
+            return self._parse_render()
         raise KqlUnsupportedError(f"Operator '{keyword}' is not supported")
 
     def _parse_join(self) -> JoinOp:
@@ -298,6 +301,56 @@ class Parser:
             tables.append(self._expect_identifier("Expected table name in union"))
 
         return UnionOp(tables=tuple(tables), kind=kind, withsource=withsource)
+
+    def _parse_render(self) -> RenderOp:
+        """Parse render operator: render visualization [with (properties)]."""
+        # Visualization type can be identifier or keyword
+        token = self._current()
+        if token.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            visualization = self._advance().value
+        else:
+            raise KqlParseError("Expected visualization type after 'render'")
+
+        xcolumn: str | None = None
+        ycolumns: list[str] = []
+        title: str | None = None
+
+        # Parse optional 'with' properties: with (xcolumn=col, ycolumns=col1,col2, title="...")
+        if self._current().type == TokenType.KEYWORD and self._current().value == "with":
+            self._advance()  # consume 'with'
+            if self._match(TokenType.LPAREN):
+                while not self._match(TokenType.RPAREN):
+                    prop_name = self._expect_identifier("Expected property name")
+                    self._expect(TokenType.EQ, f"Expected '=' after property '{prop_name}'")
+                    if prop_name == "xcolumn":
+                        xcolumn = self._expect_identifier("Expected column name for xcolumn")
+                    elif prop_name == "ycolumns":
+                        ycolumns.append(self._expect_identifier("Expected column name for ycolumns"))
+                        while self._match(TokenType.COMMA) and self._current().type != TokenType.RPAREN:
+                            # Check if next token looks like another property assignment
+                            if self._peek().type == TokenType.EQ:
+                                # backtrack: this comma separates properties
+                                self._index -= 1
+                                break
+                            ycolumns.append(self._expect_identifier("Expected column name for ycolumns"))
+                    elif prop_name == "title":
+                        token = self._current()
+                        if token.type == TokenType.STRING:
+                            title = self._advance().value
+                        else:
+                            title = self._expect_identifier("Expected title value")
+                    else:
+                        # Skip unknown properties
+                        self._advance()
+                    # Consume optional comma between properties
+                    self._match(TokenType.COMMA)
+
+        return RenderOp(
+            visualization=visualization,
+            xcolumn=xcolumn,
+            ycolumns=tuple(ycolumns),
+            title=title,
+        )
 
     # ============ Expression parsing ============
 

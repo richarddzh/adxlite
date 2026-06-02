@@ -464,6 +464,229 @@ with AdxLiteClient(":memory:") as client:
     print(result)
 ```
 
+---
+
+# adxpandas API Reference
+
+The `adxpandas` package provides pure-pandas KQL query execution — no SQLite or external databases required. It works directly on pandas DataFrames in memory.
+
+## Public modules at a glance
+
+| Module | Main public surface |
+| --- | --- |
+| `adxpandas` | `AdxPandasClient`, `Wrap`, `RenderResult` |
+| `adxpandas.parser` | `parse_kql()` |
+| `adxpandas.magic` | Jupyter `%kql` / `%%kql` magic |
+| `adxpandas.render` | `RenderResult`, `render()` |
+| `adxpandas.wrap` | `Wrap` |
+
+## `AdxPandasClient`
+
+The multi-table KQL client that executes queries against named DataFrames.
+
+### Constructor
+
+```python
+AdxPandasClient()
+```
+
+Creates a client instance with no tables registered.
+
+### `register_table()`
+
+```python
+register_table(name: str, df: pandas.DataFrame) -> None
+```
+
+Registers a DataFrame as a named table that can be referenced in KQL queries.
+
+### `query()`
+
+```python
+query(kql: str) -> pandas.DataFrame
+```
+
+Executes a KQL query against registered tables and returns a DataFrame.
+
+### Example
+
+```python
+from adxpandas import AdxPandasClient
+import pandas as pd
+
+client = AdxPandasClient()
+client.register_table("Events", pd.DataFrame({"city": ["A", "B"], "score": [10, 20]}))
+result = client.query("Events | where score > 15")
+```
+
+## `Wrap`
+
+A single-DataFrame quick-query interface with method chaining. Ideal for interactive exploration.
+
+### Constructor
+
+```python
+Wrap(df: pandas.DataFrame)
+```
+
+### Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `df` | `pandas.DataFrame` | The underlying DataFrame |
+
+### `execute()`
+
+```python
+execute(query: str) -> Wrap | RenderResult
+```
+
+Executes a KQL query using `self` as the table name. Returns `Wrap` for chaining, or `RenderResult` if the query ends with a `render` operator.
+
+### Chaining Methods
+
+All chaining methods return a new `Wrap` instance:
+
+| Method | KQL equivalent | Example |
+| --- | --- | --- |
+| `where(condition)` | `\| where ...` | `w.where("x > 10")` |
+| `project(*cols)` | `\| project ...` | `w.project("name", "age")` |
+| `project_away(*cols)` | `\| project-away ...` | `w.project_away("temp")` |
+| `extend(*exprs)` | `\| extend ...` | `w.extend("y = x * 2")` |
+| `summarize(agg, by=)` | `\| summarize ...` | `w.summarize("count()", by="city")` |
+| `sort(by)` | `\| sort by ...` | `w.sort("score desc")` |
+| `order(by)` | `\| order by ...` | Alias for `sort()` |
+| `take(n)` | `\| take n` | `w.take(10)` |
+| `limit(n)` | `\| limit n` | Alias for `take()` |
+| `top(n, by)` | `\| top n by ...` | `w.top(5, "score desc")` |
+| `count()` | `\| count` | `w.count()` |
+| `distinct(*cols)` | `\| distinct ...` | `w.distinct("city")` |
+
+### `render()`
+
+```python
+render(visualization: str = "linechart", **kwargs) -> RenderResult
+```
+
+Terminal method — creates a chart from the current DataFrame.
+
+**kwargs:** `xcolumn`, `ycolumns` (str or tuple), `title`
+
+### Example
+
+```python
+from adxpandas import Wrap
+import pandas as pd
+
+df = pd.DataFrame({"city": ["NYC", "LA", "SF"], "pop": [8, 4, 1]})
+w = Wrap(df)
+
+# Method chaining
+result = w.where("pop > 2").sort("pop desc")
+print(result.df)
+
+# Full KQL query
+result = w.execute("self | summarize total=sum(pop)")
+
+# Render chart
+chart = w.render("barchart", xcolumn="city", title="Population")
+chart.show()
+```
+
+### Notes
+
+- Uses `self` as the implicit table name
+- Each method returns a **new** Wrap — the original is never mutated
+- `__len__()` returns row count; `_repr_html_()` renders in Jupyter
+
+## `RenderResult`
+
+Result of a query that ends with a `render` operator. Displays charts in Jupyter notebooks.
+
+### Fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `df` | `pandas.DataFrame` | The query result data |
+| `render_op` | `RenderOp` | The render specification |
+
+### Properties
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `figure` | `matplotlib.Figure` | Lazily-created matplotlib figure |
+
+### `_repr_html_()`
+
+Returns a base64-encoded PNG `<img>` tag for Jupyter display.
+
+### `show()`
+
+Calls `matplotlib.pyplot.show()` to display the chart interactively.
+
+### Example
+
+```python
+from adxpandas import Wrap
+
+w = Wrap(df)
+result = w.execute("self | summarize avg(score) by city | render barchart")
+result.show()  # Opens matplotlib window
+```
+
+### Notes
+
+- Requires `matplotlib` (`pip install adxpandas[notebook]`)
+- The figure is created lazily on first access
+- Supported chart types: `timechart`, `linechart`, `barchart`, `columnchart`, `piechart`, `areachart`, `table`
+
+## Jupyter Magic (`%kql`)
+
+The `adxpandas.magic` module provides `%kql` and `%%kql` magic commands for Jupyter notebooks.
+
+### Setup
+
+```python
+import adxpandas.magic
+```
+
+This registers the magic commands if IPython is available.
+
+### Line Magic
+
+```python
+%kql df | where x > 5 | take 10
+```
+
+Executes a single-line KQL query. The first identifier is resolved from local/global namespace as a DataFrame or Wrap.
+
+### Cell Magic
+
+```python
+%%kql df
+| where x > 5
+| summarize count() by city
+| render barchart
+```
+
+The first line after `%%kql` specifies the table name. Subsequent lines form the query body.
+
+### Notes
+
+- Scans `locals()` and IPython's `user_ns` for DataFrames and Wraps
+- Returns `Wrap` or `RenderResult` depending on whether the query has a `render` clause
+- Requires IPython/Jupyter environment
+
+## adxpandas Exception
+
+### `AdxPandasError`
+
+Base exception for adxpandas operations.
+
+```python
+from adxpandas import AdxPandasError
+```
+
 ## Related documents
 
 - [Quickstart](../guides/quickstart.md)

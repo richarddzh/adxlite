@@ -1,8 +1,8 @@
 # AdxLite
 
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-pytest-success)](tests)
-[![Docs](https://img.shields.io/badge/docs-complete-blueviolet)](docs/README.md)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](adxlite/pyproject.toml)
+[![Tests](https://github.com/richarddzh/adxlite/actions/workflows/tests.yml/badge.svg)](https://github.com/richarddzh/adxlite/actions/workflows/tests.yml)
+[![Docs](https://img.shields.io/badge/docs-online-blueviolet)](https://richarddzh.github.io/adxlite/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 AdxLite is a local, SQLite-backed analytical engine that lets Python applications query pandas-ingested tables with a practical subset of Kusto Query Language (KQL). It is designed for embedded analytics, reproducible local experimentation, and testable data workflows: data is stored in a single SQLite database, KQL pipelines are parsed and translated to SQL, and advanced features such as `parse` are finished with pandas post-processing when SQL alone is not sufficient.
@@ -148,9 +148,11 @@ AdxLite is intentionally narrower than Azure Data Explorer. The project supports
 | Advanced parsing | `parse` with pandas post-processing |
 | Multi-table | `union T1, T2` and `join kind=X (T) on key` |
 
-Unsupported categories include `mv-expand`, `mv-apply`, `render`, `invoke`, and `evaluate`. Function `let` (lambda definitions) is also unsupported. See [docs/reference/limitations.md](docs/reference/limitations.md) for details and workarounds.
+Unsupported categories include `mv-expand`, `mv-apply`, `invoke`, and `evaluate`. Function `let` (lambda definitions) is also unsupported. The `render` operator is supported only in adxpandas (Wrap and magic). See [docs/reference/limitations.md](docs/reference/limitations.md) for details and workarounds.
 
 ## Documentation map
+
+Full documentation is available at **https://richarddzh.github.io/adxlite/**
 
 Start here if you are new to the project:
 
@@ -173,34 +175,52 @@ Read these if you want internals or exact semantics:
 
 ## Development setup
 
+This is a monorepo containing two packages:
+
+```text
+adxpandas/    # Pure-pandas KQL execution engine
+adxlite/      # SQLite-backed KQL database (depends on adxpandas)
+```
+
 Clone the repository and install editable dependencies:
 
 ```bash
-git clone <your-fork-or-repository-url>
+git clone https://github.com/richarddzh/adxlite.git
 cd adxlite
-python -m venv .venv
-.venv\Scripts\activate
-python -m pip install -e .[dev]
+scripts/setup.ps1    # Windows
+# or: scripts/setup.sh  # Linux/macOS
 ```
 
 Run the test suite:
 
 ```bash
-python -m pytest -q
+scripts/test.ps1     # Windows
+# or: scripts/test.sh   # Linux/macOS
 ```
-
-The test suite covers parser behavior, translation, UDF semantics, datetime handling, advanced query behavior, and end-to-end execution.
 
 ## Project structure
 
 ```text
-src/adxlite/
-├── client.py           # Public Python API
-├── exceptions.py       # Public exception types
-├── parser/             # Tokenizer, AST, parser
-├── translator/         # KQL-to-SQL translation
-├── storage/            # SQLite storage and UDF registration
-└── engine/             # Planning, execution, pandas fallback
+adxpandas/              # Pure-pandas KQL engine
+├── src/adxpandas/
+│   ├── client.py       # AdxPandasClient API
+│   ├── wrap.py         # Wrap - single DataFrame quick query
+│   ├── magic.py        # Jupyter %kql magic
+│   ├── render.py       # Chart rendering (render operator)
+│   ├── parser/         # Tokenizer, AST, parser
+│   ├── engine/         # Pandas execution engine
+│   └── functions.py    # KQL function implementations
+└── tests/
+
+adxlite/                # SQLite + KQL database
+├── src/adxlite/
+│   ├── client.py       # Public Python API
+│   ├── exceptions.py   # Public exception types
+│   ├── parser/         # Shim re-exports from adxpandas
+│   ├── translator/     # KQL-to-SQL translation
+│   ├── storage/        # SQLite storage and UDF registration
+│   └── engine/         # Planning, execution, pandas fallback
+└── tests/
 ```
 
 ## Typical use cases

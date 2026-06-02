@@ -33,6 +33,9 @@ AdxLite is a local, SQLite-based analytical engine that accepts a supported subs
 | FR-19 | `let` statement support | mandatory |
 | FR-20 | `union` operator support | mandatory |
 | FR-21 | `join` operator support | mandatory |
+| FR-22 | Wrap single-DataFrame quick-query API (adxpandas) | mandatory |
+| FR-23 | Jupyter magic commands (adxpandas) | mandatory |
+| FR-24 | `render` operator chart visualization (adxpandas) | mandatory |
 
 ## FR-01: SQLite-based local file database
 
@@ -474,3 +477,109 @@ AdxLite must support joining two local tables based on key columns.
 - Column conflict: verify `_right` suffix
 - Join with empty right table: left outer returns all left rows with NULL
 - Right side sub-pipeline: verify filter applies before join
+
+## FR-22: Wrap single-DataFrame quick-query API (adxpandas)
+
+adxpandas must provide a `Wrap` class that wraps a single DataFrame for quick KQL queries with method chaining.
+
+### Rationale
+
+Many users work with a single DataFrame and want a quick, fluent way to apply KQL operators without setting up a client and registering tables. The Wrap pattern (inspired by KustoPandas) provides this.
+
+### Expected behavior
+
+- `Wrap(df)` wraps any pandas DataFrame
+- `w.execute("self | where x > 1 | project name")` runs a query using `self` as the table name
+- `execute()` returns a new `Wrap` for further chaining (or `RenderResult` if query ends with render)
+- Convenience methods `.where()`, `.project()`, `.extend()`, `.summarize()`, `.sort()`, `.take()`, `.top()`, `.count()`, `.distinct()`, `.project_away()` each return a new `Wrap`
+- `.render()` returns a `RenderResult` (not chainable — terminal operation)
+- `.df` property exposes the underlying DataFrame
+- `_repr_html_()` delegates to DataFrame for Jupyter display
+- The wrapped DataFrame is never mutated; each operation returns a new Wrap
+
+### Validation ideas
+
+- `Wrap(df).where("x > 1")` returns Wrap with filtered rows
+- Chain: `w.where(...).project(...).take(5)` produces correct result
+- `w.df` is the expected DataFrame
+- `w.execute("self | ...")` works with any KQL pipeline
+
+## FR-23: Jupyter magic commands (adxpandas)
+
+adxpandas must provide IPython/Jupyter magic commands for interactive KQL querying.
+
+### Rationale
+
+Notebooks are a primary use case. Magic commands let users write KQL directly in cells without Python boilerplate.
+
+### Expected behavior
+
+- `import adxpandas.magic` registers the `%kql` and `%%kql` magic
+- Line magic: `%kql df | where x > 1 | take 5` — executes against local-scope DataFrames
+- Cell magic: `%%kql\ndf | where x > 1` — multi-line queries
+- Variables in the local and global namespace that are DataFrames or Wraps are available as table names
+- Returns `Wrap` (displayable in notebook) or `RenderResult` (if query ends with render)
+- Result can be captured: `result = %kql df | where x > 1`
+- IPython is a lazy import; `import adxpandas` must succeed without IPython installed
+- If IPython is not available when importing `adxpandas.magic`, raise a clear ImportError
+
+### Validation ideas
+
+- Magic returns correct filtered DataFrame
+- Multiple DataFrames in namespace can be referenced
+- Wrap objects in namespace are usable as tables
+- Missing IPython raises clear error
+
+## FR-24: `render` operator chart visualization (adxpandas)
+
+adxpandas must support the KQL `render` operator for chart visualization.
+
+### Rationale
+
+KQL's `render` operator is a standard way to visualize query results. Supporting it allows users to produce charts from their queries without separate plotting code.
+
+### Supported visualization types
+
+| Type | Chart | Description |
+|------|-------|-------------|
+| `timechart` | Line chart | Time series with datetime x-axis |
+| `linechart` | Line chart | General line chart |
+| `barchart` | Horizontal bar | Horizontal bar chart |
+| `columnchart` | Vertical bar | Vertical bar chart |
+| `piechart` | Pie chart | Proportional display |
+| `areachart` | Area chart | Filled line chart |
+| `table` | Table figure | Tabular display |
+
+### Supported syntax
+
+```
+T | ... | render visualization [with (xcolumn=col, ycolumns=col1, title="...")]
+```
+
+### Expected behavior
+
+- `render` must be the **terminal** operator in a pipeline (nothing follows it)
+- `render` is a **display directive**, not a data transformation — it does not change the DataFrame
+- The executor ignores RenderOp during execution (no effect on data pipeline)
+- When detected by Wrap or magic, the result is a `RenderResult` object
+- `RenderResult` has a `.df` property for the raw data and `.figure` for the matplotlib figure
+- `RenderResult._repr_html_()` embeds the chart as PNG in notebooks
+- matplotlib is a lazy import; render raises ImportError with install instructions if missing
+- `AdxPandasClient.query()` always returns a DataFrame (render is ignored at that level)
+- Wrap `.render()` method creates a RenderResult directly (without query string)
+
+### Design constraints
+
+- RenderOp is modeled as an Operator AST node for parser consistency
+- The parser accepts render anywhere in the pipeline position but semantically it should be terminal
+- `with (...)` properties are optional and parsed as key=value pairs
+- Default xcolumn is the first column; default ycolumns are all remaining columns
+
+### Validation ideas
+
+- `T | summarize count() by city | render barchart` parses correctly
+- Executor produces correct DataFrame (render doesn't alter data)
+- `Wrap.execute("self | ... | render timechart")` returns RenderResult
+- `Wrap.render("barchart")` returns RenderResult
+- Missing matplotlib gives clear ImportError
+- `render` with `with (xcolumn=time, title="My Chart")` parses properties

@@ -812,3 +812,46 @@ Events | join kind=leftanti (Acknowledged) on event_id
 - `hint.strategy` parameters
 - Cross-database joins
 - `innerunique` exact right-dedup semantics in SQL mode (treated as `inner`)
+
+---
+
+## `render`
+
+**Syntax**
+
+```kql
+Table | ... | render visualization [with (properties)]
+```
+
+**Description**
+
+Instructs the client to display query results as a chart. `render` is always the **last** operator in a pipeline — it does not transform data, only visualization metadata.
+
+**Parameters**
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `visualization` | identifier | Chart type: `timechart`, `linechart`, `barchart`, `columnchart`, `piechart`, `areachart`, `table` |
+| `xcolumn` | column name (optional) | Column for x-axis |
+| `ycolumns` | column list (optional) | Columns for y-axis |
+| `title` | string (optional) | Chart title |
+
+**Examples**
+
+```kql
+Events | summarize count() by city | render barchart
+Events | summarize avg(score) by bin(timestamp, 1h) | render timechart with (title="Hourly Scores")
+Events | render piechart with (xcolumn=city, ycolumns=population)
+```
+
+**Behavior**
+
+- **adxpandas**: Returns a `RenderResult` object containing both the DataFrame and chart (matplotlib figure). Displays inline in Jupyter notebooks.
+- **adxlite**: The `render` operator is **not supported** — it raises `KqlUnsupportedError`. Use adxpandas directly for chart rendering.
+
+**Notes**
+
+- `render` must be terminal (last operator in the pipeline)
+- Requires `matplotlib` installed (`pip install adxpandas[notebook]`)
+- The `with (...)` property syntax is optional
+- Unknown chart types default to `linechart`

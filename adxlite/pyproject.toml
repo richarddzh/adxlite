@@ -14,6 +14,12 @@ dependencies = [
     "adxpandas>=0.1.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/richarddzh/adxlite"
+Documentation = "https://richarddzh.github.io/adxlite/"
+Repository = "https://github.com/richarddzh/adxlite"
+Issues = "https://github.com/richarddzh/adxlite/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",

@@ -1,8 +1,8 @@
 site_name: AdxLite Documentation
 site_description: Local SQLite database with Kusto Query Language support
-site_url: https://adxlite.github.io/adxlite/
-repo_url: https://github.com/adxlite/adxlite
-repo_name: adxlite/adxlite
+site_url: https://richarddzh.github.io/adxlite/
+repo_url: https://github.com/richarddzh/adxlite
+repo_name: richarddzh/adxlite
 
 theme:
   name: material
@@ -76,4 +76,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/adxlite/adxlite
+      link: https://github.com/richarddzh/adxlite

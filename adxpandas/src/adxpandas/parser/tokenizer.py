@@ -32,6 +32,7 @@ KEYWORDS = {
     "project",
     "project-away",
     "project_away",
+    "render",
     "right",
     "sort",
     "summarize",

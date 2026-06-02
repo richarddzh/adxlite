@@ -197,6 +197,16 @@ class UnionOp(Operator):
 
 
 @dataclass(frozen=True)
+class RenderOp(Operator):
+    """Render operator: | render visualization [with (properties)]."""
+
+    visualization: str  # timechart, barchart, columnchart, piechart, linechart, table
+    xcolumn: str | None = None
+    ycolumns: tuple[str, ...] = ()
+    title: str | None = None
+
+
+@dataclass(frozen=True)
 class Pipeline:
     """A parsed KQL pipeline."""
 

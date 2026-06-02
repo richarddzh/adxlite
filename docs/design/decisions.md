@@ -14,6 +14,10 @@ This document explains the major design choices behind AdxLite. The goal is not 
 | Scalar extensions | SQLite UDFs plus pandas row-wise equivalents |
 | Datetime storage | ISO-8601 text with metadata |
 | SQL safety | Parameterized queries |
+| Render operator | Display directive, not data transformation |
+| Wrap API | Chainable Wrap returns, terminal render returns RenderResult |
+| Optional dependencies | Lazy imports with clear error messages |
+| Magic namespace | Scans local + global for DataFrames/Wraps |
 
 ## Why SQLite
 
@@ -291,3 +295,68 @@ Users see the consequences of these decisions in practical ways:
 - [Architecture](architecture.md) shows where each decision appears in the code layout.
 - [Type system](type-system.md) explains the consequences of the datetime and schema choices.
 - [Limitations](../reference/limitations.md) describes the boundaries created by these decisions.
+
+## Render as display directive (not data transformation)
+
+The KQL `render` operator is modeled in the AST as a `RenderOp` node but treated differently from all other operators during execution.
+
+### Decision
+
+`render` is a terminal display directive. It does not transform data. The execution engine skips it entirely; visualization is handled by the `Wrap` class or magic layer.
+
+### Alternatives considered
+
+1. **Render as a normal operator returning a chart object** — rejected because it breaks the DataFrame contract of the execution engine.
+2. **Separate render from the AST entirely (pre-parse strip)** — rejected because it loses type safety and makes validation harder (e.g., detecting render in non-terminal position).
+3. **ExecutionEngine returns `(DataFrame, RenderSpec | None)` tuple** — rejected because it changes the public API contract for AdxPandasClient.
+
+### Tradeoffs
+
+- The parser and AST are complete and can validate render position
+- The executor stays simple (just skips RenderOp)
+- Wrap/magic handle the presentation layer separately
+- `AdxPandasClient.query()` always returns DataFrame (backward compatible)
+
+## Wrap returns Wrap, render returns RenderResult
+
+### Decision
+
+All Wrap convenience methods (`.where()`, `.project()`, etc.) return a new `Wrap` instance for method chaining. The `.render()` method and queries ending in `| render` return a `RenderResult` — a terminal, non-chainable result that displays charts in notebooks.
+
+### Rationale
+
+Method chaining requires a consistent return type. Render is inherently terminal (you display a chart, you don't filter it further). Separating the two keeps the API predictable.
+
+## Optional dependencies with lazy imports
+
+### Decision
+
+matplotlib and IPython are optional. They are never imported at module level. The main `import adxpandas` works without either installed. Only when user calls render or imports magic do they get a clear ImportError with install instructions.
+
+### Rationale
+
+adxpandas must be usable as a lightweight library for scripts and tests. Not all users run in Jupyter or need charts. Making these optional keeps the core dependency list minimal (pandas only).
+
+### Implementation
+
+- `adxpandas[notebook]` extra includes ipython and matplotlib
+- `render.py` lazily imports `matplotlib.pyplot`
+- `magic.py` imports IPython at module level but is never auto-imported by `__init__.py`
+
+## Magic namespace scanning
+
+### Decision
+
+The `%kql` magic scans the caller's local namespace and IPython's global `user_ns` for variables that are DataFrames or Wraps. These become available as table names in the query. Local scope takes precedence over global scope.
+
+### Alternatives considered
+
+1. **Explicit table registration** — rejected for notebook UX (too verbose for interactive use)
+2. **Only local scope** — rejected because global DataFrames defined earlier in the notebook would be invisible
+3. **All namespace variables** — not feasible; we filter to DataFrame/Wrap types only
+
+### Tradeoffs
+
+- Automatic discovery means variable naming matters (table names = variable names)
+- Private variables (starting with `_`) are excluded to reduce noise
+- Wrap objects are unwrapped to their `.df` for the execution engine

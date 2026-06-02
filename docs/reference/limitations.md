@@ -28,7 +28,7 @@ The following operators are not implemented and will raise `KqlUnsupportedError`
 | --- | --- | --- |
 | `mv-expand` | Needs array/dynamic expansion semantics not present in the current dynamic model | Deserialize JSON in Python and re-ingest flattened rows |
 | `mv-apply` | Depends on dynamic expansion plus subquery semantics | Perform the logic in pandas before ingestion |
-| `render` | Visualization is outside the scope of a local query engine | Use pandas plotting or notebook/charting tools after query execution |
+| `render` | Supported in adxpandas (Wrap and magic); not in adxlite SQLite execution path | Use `adxpandas.Wrap` or `%kql` magic with `\| render` for chart output |
 | `invoke` | Depends on stored-function or function-object semantics not present in the engine | Call Python helpers around queries instead |
 | `evaluate` | Opens a broad plugin/operator surface outside the current execution model | Perform custom post-processing in Python |
 

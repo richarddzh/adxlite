@@ -196,3 +196,35 @@ These are implementation rules specific to this codebase:
 - When adding new operators, decide SQL vs pandas routing in the planner.
 - The parser is recursive-descent; extend it by adding new AST nodes and parse methods.
 - Use `docs/design/requirements.md` to track feature requirements with FR-XX IDs.
+
+## 7. Environment Rules
+
+### Always use the project venv
+
+All Python commands (pytest, pip install, python -c, etc.) MUST use the venv python:
+
+```powershell
+# Correct:
+& Q:\gitroot\adxlite\.venv\Scripts\python.exe -m pytest tests/
+& .\.venv\Scripts\python.exe -m pip install ipython
+
+# Wrong — uses system Python, not the project venv:
+python -m pytest tests/
+pip install ipython
+```
+
+**Why:** The system Python may have different packages installed. Tests must run in the venv to reflect the actual project dependencies. Installing packages outside the venv pollutes the system and doesn't ensure reproducibility.
+
+### Running tests
+
+Tests must be run from each sub-project's directory so pytest picks up the correct `pyproject.toml`:
+
+```powershell
+Set-Location Q:\gitroot\adxlite\adxpandas
+& Q:\gitroot\adxlite\.venv\Scripts\python.exe -m pytest tests/ --tb=short
+
+Set-Location Q:\gitroot\adxlite\adxlite
+& Q:\gitroot\adxlite\.venv\Scripts\python.exe -m pytest tests/ --tb=short
+```
+
+Or use the script: `.\scripts\test.ps1`

@@ -17,6 +17,7 @@ from adxpandas.parser.ast_nodes import (
     Pipeline,
     ProjectAwayOp,
     ProjectOp,
+    RenderOp,
     TableRef,
     UnaryOp,
     UnionPipeline,
@@ -189,6 +190,8 @@ class PandasExecutionEngine:
         # Apply downstream operators
         if union.operators:
             for operator in union.operators:
+                if isinstance(operator, RenderOp):
+                    continue  # render is a display directive, not a data transform
                 resolved = self._resolve_operator(operator, result)
                 result = self._pandas.apply(result, resolved)
 
@@ -203,6 +206,8 @@ class PandasExecutionEngine:
             self._pandas.set_scalar_lets(scalar_lets)
         try:
             for operator in pipeline.operators:
+                if isinstance(operator, RenderOp):
+                    continue  # render is a display directive, not a data transform
                 resolved = self._resolve_operator(operator, result)
                 result = self._pandas.apply(result, resolved)
         finally:

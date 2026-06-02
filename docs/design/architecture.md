@@ -18,19 +18,24 @@ repo_root/
 │   │   ├── engine/         # Pandas execution engine
 │   │   ├── functions.py    # Pure-Python KQL function implementations
 │   │   ├── client.py       # AdxPandasClient API
+│   │   ├── wrap.py         # Wrap class (single-DataFrame quick query)
+│   │   ├── magic.py        # Jupyter %kql magic (optional, requires IPython)
+│   │   ├── render.py       # Chart rendering (optional, requires matplotlib)
 │   │   └── exceptions.py   # Base exceptions
 │   └── tests/
-├── src/adxlite/            # Main project: SQLite-backed KQL engine
-│   ├── parser/             # Shim modules re-exporting from adxpandas
-│   ├── engine/             # SQLite+pandas hybrid execution
-│   ├── translator/         # AST-to-SQL translation (SQLite-specific)
-│   ├── storage/            # SQLite database layer
-│   ├── client.py           # AdxLiteClient API
-│   └── exceptions.py       # Re-exports + SQLite-specific exceptions
-├── tests/                  # adxlite tests
+├── adxlite/                # Main project: SQLite-backed KQL engine
+│   ├── pyproject.toml
+│   ├── src/adxlite/
+│   │   ├── parser/         # Shim modules re-exporting from adxpandas
+│   │   ├── engine/         # SQLite+pandas hybrid execution
+│   │   ├── translator/     # AST-to-SQL translation (SQLite-specific)
+│   │   ├── storage/        # SQLite database layer
+│   │   ├── client.py       # AdxLiteClient API
+│   │   └── exceptions.py   # Re-exports + SQLite-specific exceptions
+│   └── tests/
 ├── docs/                   # Shared documentation
-├── pyproject.toml          # adxlite project config
-└── mkdocs.yml
+├── mkdocs.yml
+└── README.md
 ```
 
 ## Architectural goals

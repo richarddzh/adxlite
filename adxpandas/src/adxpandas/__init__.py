@@ -8,6 +8,8 @@ from adxpandas.exceptions import (
     KqlUnsupportedError,
     TableNotFoundError,
 )
+from adxpandas.wrap import Wrap
+from adxpandas.render import RenderResult
 
 __all__ = [
     "AdxPandasClient",
@@ -15,5 +17,7 @@ __all__ = [
     "ExecutionError",
     "KqlParseError",
     "KqlUnsupportedError",
+    "RenderResult",
     "TableNotFoundError",
+    "Wrap",
 ]

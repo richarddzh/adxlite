@@ -13,10 +13,20 @@ dependencies = [
     "pandas>=1.5.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/richarddzh/adxlite"
+Documentation = "https://richarddzh.github.io/adxlite/"
+Repository = "https://github.com/richarddzh/adxlite"
+Issues = "https://github.com/richarddzh/adxlite/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+]
+notebook = [
+    "ipython>=7.0",
+    "matplotlib>=3.5.0",
 ]
 
 [tool.hatch.build.targets.wheel]
