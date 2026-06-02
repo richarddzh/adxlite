@@ -9,7 +9,19 @@ permissions:
   id-token: write
 
 jobs:
+  test-gate:
+    uses: ./.github/workflows/tests.yml
+
+  docs-gate:
+    needs: test-gate
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
   build:
+    needs: [test-gate, docs-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

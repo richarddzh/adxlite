@@ -12,6 +12,7 @@ on:
       - 'adxpandas/**'
       - 'adxlite/**'
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   test:
