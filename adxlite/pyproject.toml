@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "adxlite"
-version = "0.2.2"
+version = "0.2.3"
 description = "A local SQLite-based database with Kusto Query Language (KQL) support"
 readme = "README.md"
 license = "MIT"

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "adxpandas"
-version = "0.2.2"
+version = "0.2.3"
 description = "Execute Kusto Query Language (KQL) queries over pandas DataFrames"
 readme = "README.md"
 license = "MIT"
