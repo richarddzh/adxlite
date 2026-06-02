@@ -62,6 +62,8 @@ nav:
       - Design Decisions: design/decisions.md
       - Type System: design/type-system.md
       - Requirements: design/requirements.md
+      - "Let/Union/Join Design": design/let-union-join.md
+      - "Let/Union/Join Tradeoffs": design/let-union-join-tradeoffs.md
   - Reference:
       - KQL Syntax: reference/kql-syntax.md
       - Operators: reference/operators.md

@@ -116,17 +116,17 @@ class Database:
             raise ExecutionError(f"SQLite execution failed: {exc}") from exc
 
     def table_exists(self, table_name: str) -> bool:
-        """Return whether a user table exists."""
+        """Return whether a user table or view exists."""
         cursor = self._connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
             (table_name,),
         )
         return cursor.fetchone() is not None
 
     def list_tables(self) -> list[str]:
-        """List user tables excluding internal metadata tables."""
+        """List user tables excluding internal metadata tables and temp tables."""
         cursor = self._connection.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '__adxlite_%' ORDER BY name"
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '__adxlite_%' AND name NOT LIKE '__let_%' AND name NOT LIKE '__union_%' ORDER BY name"
         )
         return [row[0] for row in cursor.fetchall()]
 
@@ -142,13 +142,31 @@ class Database:
         return {row[0]: row[1] for row in rows}
 
     def drop_table(self, table_name: str) -> None:
-        """Drop a user table and its metadata."""
-        if not self.table_exists(table_name):
+        """Drop a user table (or view) and its metadata."""
+        # Check if it's a view first
+        cursor = self._connection.execute(
+            "SELECT type FROM sqlite_master WHERE name = ?",
+            (table_name,),
+        )
+        row = cursor.fetchone()
+        if row is None:
             raise TableNotFoundError(f"Table '{table_name}' does not exist")
-        self._connection.execute(f"DROP TABLE {quote_identifier(table_name)}")
+        obj_type = row[0]
+        if obj_type == "view":
+            self._connection.execute(f"DROP VIEW {quote_identifier(table_name)}")
+        else:
+            self._connection.execute(f"DROP TABLE {quote_identifier(table_name)}")
         self._connection.execute(
             f"DELETE FROM {quote_identifier(self.META_TABLE)} WHERE table_name = ?",
             (table_name,),
+        )
+        self._connection.commit()
+
+    def create_view(self, view_name: str, source_table: str) -> None:
+        """Create a view that aliases source_table as view_name."""
+        self._connection.execute(f"DROP VIEW IF EXISTS {quote_identifier(view_name)}")
+        self._connection.execute(
+            f"CREATE VIEW {quote_identifier(view_name)} AS SELECT * FROM {quote_identifier(source_table)}"
         )
         self._connection.commit()
 

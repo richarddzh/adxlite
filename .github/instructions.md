@@ -43,6 +43,7 @@ parser -> exceptions
 ### Operators
 - `where`, `project`, `project-away`, `extend`, `summarize`
 - `take`, `limit`, `count`, `sort by`, `order by`, `top`, `distinct`, `parse`
+- `let` (scalar and tabular), `union` (source and pipe form), `join` (all 9 kinds)
 - `.append TableName <| query`
 
 ### Functions
@@ -55,7 +56,8 @@ parser -> exceptions
 - Conditional/conversion: `iif`, `iff`, `coalesce`, `isnull`, `isnotnull`, `isempty`, `isnotempty`, `tostring`, `toint`, `tolong`, `todouble`, `toreal`
 
 ### Unsupported
-Raise `KqlUnsupportedError` for `join`, `union`, `mv-expand`, `mv-apply`, `render`, `let`, `invoke`, and `evaluate`.
+Raise `KqlUnsupportedError` for `mv-expand`, `mv-apply`, `render`, `invoke`, and `evaluate`.
+Function `let` (lambda bindings) is also unsupported.
 
 ## Testing
 

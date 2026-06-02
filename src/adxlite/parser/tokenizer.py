@@ -17,21 +17,31 @@ KEYWORDS = {
     "distinct",
     "extend",
     "false",
+    "inner",
+    "join",
+    "kind",
+    "left",
+    "let",
     "limit",
     "not",
+    "on",
     "or",
     "order",
+    "outer",
     "parse",
     "project",
     "project-away",
     "project_away",
+    "right",
     "sort",
     "summarize",
     "take",
     "top",
     "true",
+    "union",
     "where",
     "with",
+    "withsource",
     "has",
     "in",
     "between",
@@ -54,6 +64,7 @@ class TokenType(Enum):
     TIMESPAN = auto()
     COMMA = auto()
     PIPE = auto()
+    SEMICOLON = auto()
     LPAREN = auto()
     RPAREN = auto()
     LANGLE = auto()
@@ -71,6 +82,8 @@ class TokenType(Enum):
     STAR = auto()
     SLASH = auto()
     PERCENT = auto()
+    DOLLAR_LEFT = auto()
+    DOLLAR_RIGHT = auto()
 
 
 @dataclass(frozen=True)
@@ -100,6 +113,8 @@ class Tokenizer:
                 continue
             if char == ',':
                 tokens.append(self._simple(TokenType.COMMA, char))
+            elif char == ';':
+                tokens.append(self._simple(TokenType.SEMICOLON, char))
             elif char == '|':
                 tokens.append(self._simple(TokenType.PIPE, char))
             elif char == '(':
@@ -155,8 +170,10 @@ class Tokenizer:
                 tokens.append(self._read_bracket_identifier())
             elif char.isdigit():
                 tokens.append(self._read_number_or_timespan())
-            elif char.isalpha() or char == '_' or char == '$':
+            elif char.isalpha() or char == '_':
                 tokens.append(self._read_identifier())
+            elif char == '$':
+                tokens.append(self._read_dollar_identifier())
             else:
                 raise KqlParseError(f"Unexpected character '{char}' at position {self._index}")
         tokens.append(Token(TokenType.EOF, "", self._length))
@@ -242,7 +259,7 @@ class Tokenizer:
         start = self._index
         while True:
             char = self._peek(0)
-            if char.isalnum() or char in {'_', '$'}:
+            if char.isalnum() or char == '_':
                 self._index += 1
                 continue
             if char == '-' and self._peek(1).isalpha():
@@ -253,3 +270,17 @@ class Tokenizer:
         lowered = value.lower()
         token_type = TokenType.KEYWORD if lowered in KEYWORDS else TokenType.IDENTIFIER
         return Token(token_type, lowered if token_type == TokenType.KEYWORD else value, start)
+
+    def _read_dollar_identifier(self) -> Token:
+        """Read $left or $right qualified reference."""
+        start = self._index
+        self._index += 1  # skip $
+        word_start = self._index
+        while self._peek(0).isalpha():
+            self._index += 1
+        word = self._text[word_start:self._index]
+        if word == "left":
+            return Token(TokenType.DOLLAR_LEFT, "$left", start)
+        if word == "right":
+            return Token(TokenType.DOLLAR_RIGHT, "$right", start)
+        raise KqlParseError(f"Unknown $ reference '${word}' at position {start}")

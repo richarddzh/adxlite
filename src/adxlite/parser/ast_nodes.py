@@ -17,6 +17,14 @@ class Identifier(Expr):
 
 
 @dataclass(frozen=True)
+class QualifiedIdentifier(Expr):
+    """Qualified column reference: $left.col or $right.col."""
+
+    scope: str  # "left" or "right"
+    name: str
+
+
+@dataclass(frozen=True)
 class Literal(Expr):
     """Literal expression."""
 
@@ -88,7 +96,7 @@ class SortKey:
 class ParsePatternPart:
     """A parse operator literal or capture segment."""
 
-    kind: Literal["literal", "capture"]
+    kind: Literal["literal", "capture", "skip"]
     value: str
 
 
@@ -163,10 +171,62 @@ class ParseOp(Operator):
 
 
 @dataclass(frozen=True)
+class JoinCondition:
+    """A single join condition."""
+
+    left_col: str
+    right_col: str
+
+
+@dataclass(frozen=True)
+class JoinOp(Operator):
+    """Join operator: T1 | join kind=X (right_pipeline) on conditions."""
+
+    kind: str  # inner, leftouter, rightouter, fullouter, leftanti, leftsemi, rightanti, rightsemi, innerunique
+    right: "Pipeline"
+    conditions: tuple[JoinCondition, ...]
+
+
+@dataclass(frozen=True)
+class UnionOp(Operator):
+    """Union operator: T1 | union T2, T3."""
+
+    tables: tuple[str, ...]
+    kind: str = "outer"  # outer or inner
+    withsource: str | None = None
+
+
+@dataclass(frozen=True)
 class Pipeline:
     """A parsed KQL pipeline."""
 
     source: TableRef
+    operators: tuple[Operator, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class LetBinding:
+    """A let statement binding a name to a value or sub-pipeline."""
+
+    name: str
+    value: Expr | Pipeline  # scalar expr or tabular pipeline
+
+
+@dataclass(frozen=True)
+class KqlStatement:
+    """Complete KQL statement: optional let bindings + body pipeline."""
+
+    lets: tuple[LetBinding, ...]
+    body: Pipeline | "AppendCommand"
+
+
+@dataclass(frozen=True)
+class UnionPipeline:
+    """A query starting with union (source form): union T1, T2 | ..."""
+
+    tables: tuple[str, ...]
+    kind: str = "outer"
+    withsource: str | None = None
     operators: tuple[Operator, ...] = field(default_factory=tuple)
 
 

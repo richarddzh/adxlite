@@ -670,3 +670,145 @@ Users | extend ratio = good / total
 - [Functions reference](functions.md)
 - [Advanced query patterns](../guides/advanced-queries.md)
 - [Limitations](limitations.md)
+
+## `let`
+
+**Syntax**
+
+`kql
+let name = scalar_expression;
+let name = Table | pipeline;
+main_query
+`
+
+**Description**
+
+Binds a name to a scalar value or tabular sub-query that can be referenced in the main query body.
+
+**Forms**
+
+| Form | Example | Supported |
+|------|---------|-----------|
+| Scalar | `let x = 5; T \| where col > x` | Yes |
+| Tabular | `let t = T \| where active; t \| count` | Yes |
+| Function | `let f = (a: int) { a * 2 };` | No |
+
+**Behavior**
+
+- Multiple let bindings are separated by semicolons
+- Scalar lets substitute literal values in expressions
+- Tabular lets execute the sub-pipeline and make the result available as a table reference
+- Column names in the source table take precedence over scalar let names (Kusto semantics)
+- Tabular let results are cleaned up after query completes
+
+**Examples**
+
+`kql
+let threshold = 100;
+let high_priority = Events | where severity > 3;
+high_priority | where value > threshold | count
+`
+
+## `union`
+
+**Syntax**
+
+`kql
+// Source form
+union [kind=inner|outer] [withsource=ColumnName] Table1, Table2, ...
+
+// Pipe form
+Table1 | union [kind=inner|outer] [withsource=ColumnName] Table2, Table3
+`
+
+**Description**
+
+Combines rows from multiple tables into a single result set.
+
+**Parameters**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| kind | outer | `outer`: all columns from all tables (NULL fill). `inner`: only common columns |
+| withsource | - | Adds a column with the source table name for each row |
+
+**Behavior**
+
+- `kind=outer` (default): result has all columns from all tables; missing columns filled with NULL
+- `kind=inner`: result has only columns present in ALL tables
+- `withsource=col`: adds a string column indicating which table each row came from
+- Tables with mismatched schemas are handled via pandas (schema alignment)
+
+**Not supported**
+
+- Wildcard table names (`union T*`)
+- Sub-pipeline arguments (`union (T1 | where x > 5), T2`)
+- `isfuzzy` parameter
+
+**Examples**
+
+`kql
+union Errors, Warnings | where timestamp > ago(1h)
+Errors | union withsource=source Warnings, Info | summarize count() by source
+union kind=inner TableA, TableB | distinct col1
+`
+
+## `join`
+
+**Syntax**
+
+`kql
+LeftTable | join [kind=JoinKind] (RightTable [| operators]) on Conditions
+`
+
+**Description**
+
+Combines rows from two tables based on matching key column values.
+
+**Join Kinds**
+
+| Kind | Description | Output |
+|------|-------------|--------|
+| `innerunique` (default) | Matching rows (right dedup in pandas) | Left + Right |
+| `inner` | All matching combinations | Left + Right |
+| `leftouter` | All left rows, matched right or NULL | Left + Right |
+| `rightouter` | All right rows, matched left or NULL | Left + Right |
+| `fullouter` | All rows from both sides | Left + Right |
+| `leftanti` | Left rows with NO match on right | Left only |
+| `leftsemi` | Left rows with match on right | Left only |
+| `rightanti` | Right rows with NO match on left | Right only |
+| `rightsemi` | Right rows with match on left | Right only |
+
+**Condition Syntax**
+
+`kql
+// Simple key (same column name both sides)
+on key_column
+
+// Multiple keys
+on key1, key2
+
+// Qualified keys (different column names)
+on $left.left_col == $right.right_col
+`
+
+**Column Output Rules**
+
+- Key columns (simple form): appear once
+- Left non-key columns: keep original names
+- Right non-key columns: if name conflicts, suffixed with `_right`
+- Anti/semi joins: output only the relevant side
+
+**Examples**
+
+`kql
+Users | join kind=inner (Orders) on user_id
+Users | join kind=leftouter (Orders | where amount > 100) on $left.name == $right.customer
+Events | join kind=leftanti (Acknowledged) on event_id
+`
+
+**Not supported**
+
+- `hint.strategy` parameters
+- Cross-database joins
+- `innerunique` exact right-dedup semantics in SQL mode (treated as `inner`)

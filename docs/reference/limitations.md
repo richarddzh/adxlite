@@ -14,12 +14,12 @@ The parser explicitly treats several KQL operators as unsupported.
 
 | Operator | Status | Why unsupported right now | Typical workaround |
 | --- | --- | --- | --- |
-| `join` | unsupported | Would require multi-input relational planning and more complex schema resolution | join data in pandas before ingestion, or materialize a combined table externally |
-| `union` | unsupported | Requires multi-source pipeline composition beyond the current single-table model | append compatible rows into one table before querying |
+| `join` | **supported** | All 9 join kinds are supported | — |
+| `union` | **supported** | Source and pipe forms, kind=inner/outer, withsource | — |
+| `let` | **partially supported** | Scalar and tabular let; function let unsupported | Build queries in Python strings for function-like reuse |
 | `mv-expand` | unsupported | Needs array/dynamic expansion semantics not present in the current dynamic model | deserialize JSON in Python and re-ingest flattened rows |
 | `mv-apply` | unsupported | Depends on dynamic expansion plus subquery semantics | perform the logic in pandas before ingestion |
 | `render` | unsupported | Visualization is outside the scope of a local query engine | use pandas plotting or notebook/charting tools after query execution |
-| `let` | unsupported | Would require a variable binding and named-expression environment | build queries in Python strings or materialize tables explicitly |
 | `invoke` | unsupported | Depends on stored-function or function-object semantics not present in the engine | call Python helpers around queries instead |
 | `evaluate` | unsupported | Opens a broad plugin/operator surface outside the current execution model | perform custom post-processing in Python |
 
@@ -225,3 +225,27 @@ Consider a different tool when you need:
 - [Architecture](../design/architecture.md)
 - [Operators reference](operators.md)
 - [Functions reference](functions.md)
+
+## let/union/join specific limitations
+
+### let
+
+- **Function let is not supported.** Only scalar literals/expressions and tabular pipelines.
+- Scalar let values must be literals or simple arithmetic (no function calls in let expressions).
+- Tabular let creates a temporary table; very large tabular lets consume memory and SQLite temp storage.
+- Column names always take precedence over let variable names (Kusto semantics).
+
+### union
+
+- **Wildcard table names not supported** (`union T*` will fail).
+- **Sub-pipeline arguments not supported** (`union (T1 | where x > 5), T2`).
+- `isfuzzy` parameter is not supported.
+- Union of tables with mismatched schemas falls through to pandas execution (slower for large datasets).
+
+### join
+
+- **`innerunique` is treated as `inner` in SQL mode** — right-side deduplication only applies in pandas fallback.
+- `fullouter` and `rightouter` always execute in pandas (SQLite has no native support).
+- `hint.strategy` parameters are ignored.
+- Cross-database joins are not supported (all tables must be in the same local database).
+- The `_right` suffix for conflicting column names may differ from Kusto's exact behavior in some edge cases.

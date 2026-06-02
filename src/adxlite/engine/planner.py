@@ -11,6 +11,7 @@ from adxlite.parser.ast_nodes import (
     ExtendOp,
     FunctionCall,
     Identifier,
+    JoinOp,
     Literal,
     NamedExpr,
     Operator,
@@ -22,6 +23,7 @@ from adxlite.parser.ast_nodes import (
     TakeOp,
     TopOp,
     UnaryOp,
+    UnionOp,
     WhereOp,
     SortOp,
 )
@@ -70,7 +72,35 @@ class Planner:
         )
 
     def _is_sql_compatible(self, operator: Operator) -> bool:
-        return not isinstance(operator, ParseOp)
+        """Check if an operator can be translated to SQL."""
+        if isinstance(operator, ParseOp):
+            return False
+        # fullouter and rightouter are complex in SQLite; use pandas
+        if isinstance(operator, JoinOp) and operator.kind in {"fullouter", "rightouter"}:
+            return False
+        # Union with mismatched schemas needs pandas for schema alignment
+        if isinstance(operator, UnionOp):
+            return self._union_schemas_match(operator)
+        if isinstance(operator, JoinOp):
+            return True
+        return True
+
+    def _union_schemas_match(self, operator: UnionOp) -> bool:
+        """Check if all tables in a union have the same columns (for SQL UNION ALL)."""
+        # We can't determine the left side schema here easily, so fall through to pandas
+        # when union includes tables with different column counts
+        schemas: list[set[str]] = []
+        for table_name in operator.tables:
+            if self._database.table_exists(table_name):
+                schemas.append(set(self._database.get_schema(table_name).keys()))
+            else:
+                return False
+        if not schemas:
+            return True
+        # If all schemas are the same, SQL UNION ALL works
+        first = schemas[0]
+        return all(s == first for s in schemas)
+        return True
 
     def _resolve_operator(self, operator: Operator, schema: dict[str, str]) -> Operator:
         if isinstance(operator, ProjectAwayOp):
@@ -109,6 +139,55 @@ class Planner:
             for part in operator.pattern:
                 if part.kind == "capture":
                     result[part.value] = "string"
+            return result
+        if isinstance(operator, UnionOp):
+            # For union, merge schemas from all tables (outer = all columns)
+            result = dict(schema)
+            for table_name in operator.tables:
+                if self._database.table_exists(table_name):
+                    other_schema = self._database.get_schema(table_name)
+                    if operator.kind == "outer":
+                        for col, typ in other_schema.items():
+                            if col not in result:
+                                result[col] = typ
+                    # inner: keep only common cols (handled after all tables)
+            if operator.kind == "inner":
+                common_cols = set(schema.keys())
+                for table_name in operator.tables:
+                    if self._database.table_exists(table_name):
+                        other_schema = self._database.get_schema(table_name)
+                        common_cols &= set(other_schema.keys())
+                result = {k: v for k, v in schema.items() if k in common_cols}
+            if operator.withsource:
+                result = {operator.withsource: "string", **result}
+            return result
+        if isinstance(operator, JoinOp):
+            # Merge left schema with right schema, adding _right suffix for conflicts
+            result = dict(schema)
+            # Get right schema by inferring from the right pipeline source
+            right_source = operator.right.source.name
+            if self._database.table_exists(right_source):
+                right_schema = self._database.get_schema(right_source)
+            else:
+                right_schema = {}
+
+            # For anti/semi joins, only keep one side
+            kind = operator.kind.lower()
+            if kind in {"leftanti", "leftantisemi", "leftsemi"}:
+                return dict(schema)
+            if kind in {"rightanti", "rightantisemi", "rightsemi"}:
+                return dict(right_schema)
+
+            # Key columns (from conditions)
+            key_cols = {cond.right_col for cond in operator.conditions}
+
+            for col, typ in right_schema.items():
+                if col in key_cols:
+                    continue  # Key columns don't duplicate
+                if col in result:
+                    result[f"{col}_right"] = typ
+                else:
+                    result[col] = typ
             return result
         return dict(schema)
 

@@ -30,6 +30,9 @@ AdxLite is a local, SQLite-based analytical engine that accepts a supported subs
 | FR-16 | Rich documentation | mandatory |
 | FR-17 | Proper module architecture | mandatory |
 | FR-18 | Comprehensive tests | mandatory |
+| FR-19 | `let` statement support | mandatory |
+| FR-20 | `union` operator support | mandatory |
+| FR-21 | `join` operator support | mandatory |
 
 ## FR-01: SQLite-based local file database
 
@@ -357,3 +360,116 @@ When evaluating changes to AdxLite, use this checklist:
 - [Design decisions](decisions.md)
 - [API reference](../reference/api.md)
 - [Limitations](../reference/limitations.md)
+
+## FR-19: `let` statement support
+
+AdxLite must support `let` bindings for naming scalar values and tabular sub-queries.
+
+### Supported forms
+
+| Form | Example | Supported |
+|------|---------|-----------|
+| Scalar let | `let threshold = 100; T \| where val > threshold` | Yes |
+| Tabular let | `let errors = T \| where level == "error"; errors \| count` | Yes |
+| Function let | `let f = (x: int) { x * 2 };` | No (raise KqlUnsupportedError) |
+
+### Expected behavior
+
+- Multiple `let` bindings separated by `;` before the main query body
+- Scalar lets substitute as literal values in subsequent expressions
+- Tabular lets execute the sub-pipeline and make the result available as a table name
+- Column names in the current row scope take precedence over scalar let names (matching Kusto semantics)
+- Tabular let results are cleaned up after the main query completes
+- Later let bindings can reference earlier let bindings
+
+### Validation ideas
+
+- `let x = 5; T | where col > x` returns correct filtered result
+- `let filtered = T | where active == true; filtered | count` returns correct count
+- Column named same as let variable: column wins
+- Undefined let reference: error
+
+## FR-20: `union` operator support
+
+AdxLite must support combining rows from multiple local tables using `union`.
+
+### Supported forms
+
+| Form | Example | Supported |
+|------|---------|-----------|
+| Source form | `union T1, T2 \| where x > 5` | Yes |
+| Pipe form | `T1 \| union T2, T3` | Yes |
+| kind=outer (default) | All columns from all tables, NULL for missing | Yes |
+| kind=inner | Only columns common to all tables | Yes |
+| withsource=col | Adds a column indicating source table name | Yes |
+| Sub-pipeline args | `union (T1 \| where x > 5), T2` | No (MVP) |
+
+### Expected behavior
+
+- Schema alignment: columns missing in a table are filled with NULL (kind=outer)
+- Column ordering: first table's columns come first, then new columns from subsequent tables
+- `kind=inner`: only columns present in ALL tables appear in the result
+- `withsource=colname`: prepends a string column with the source table name per row
+- Works both as a source (before pipe) and as a pipe operator
+- Union of empty tables produces an empty result with correct schema
+
+### Validation ideas
+
+- Union two tables with same schema: row count = sum
+- Union tables with different schemas: NULL fill verified
+- kind=inner: verify only common columns in output
+- withsource: verify source column content
+- Union followed by where/summarize
+
+## FR-21: `join` operator support
+
+AdxLite must support joining two local tables based on key columns.
+
+### Supported join kinds
+
+| Kind | Behavior | Output columns |
+|------|----------|----------------|
+| `innerunique` (default) | Rows matching on both sides | Left + right |
+| `inner` | All matching row combinations | Left + right |
+| `leftouter` | All left rows, matched right or NULL | Left + right |
+| `rightouter` | All right rows, matched left or NULL | Left + right |
+| `fullouter` | All rows from both, NULL where unmatched | Left + right |
+| `leftanti` | Left rows with NO match on right | Left only |
+| `leftsemi` | Left rows with at least one match on right | Left only |
+| `rightanti` | Right rows with NO match on left | Right only |
+| `rightsemi` | Right rows with at least one match on left | Right only |
+
+### Supported syntax forms
+
+| Form | Example |
+|------|---------|
+| Simple key | `T1 \| join T2 on key` |
+| With kind | `T1 \| join kind=leftouter T2 on key` |
+| Multi-key | `T1 \| join T2 on key1, key2` |
+| Qualified keys | `T1 \| join T2 on $left.id == $right.user_id` |
+| Right sub-pipeline | `T1 \| join kind=inner (T2 \| where x > 5) on id` |
+
+### Output column naming rules
+
+- Join key columns (simple form): appear once in output (from left side)
+- Left non-key columns: keep original names
+- Right non-key columns: if name conflicts with left column, suffix with `_right`
+- Anti/semi joins: only output the relevant side's columns
+
+### Expected behavior
+
+- Default join kind is `innerunique` (treated as `inner` for MVP — no automatic right-side dedup)
+- Right side can be a full sub-pipeline enclosed in parentheses
+- NULL keys do not match (SQL semantics)
+- All tables must be in the same local database (no cross-database joins)
+
+### Validation ideas
+
+- Inner join: verify only matching rows appear
+- Left outer: verify NULL fill for unmatched right
+- Left anti: verify only non-matching left rows
+- Left semi: verify matching left rows without duplication
+- Multi-key join: verify correct matching
+- Column conflict: verify `_right` suffix
+- Join with empty right table: left outer returns all left rows with NULL
+- Right side sub-pipeline: verify filter applies before join

@@ -16,6 +16,7 @@ from adxlite.parser.ast_nodes import (
     FunctionCall,
     Identifier,
     InListExpr,
+    JoinOp,
     Literal,
     NamedExpr,
     Operator,
@@ -27,6 +28,7 @@ from adxlite.parser.ast_nodes import (
     TakeOp,
     TopOp,
     UnaryOp,
+    UnionOp,
     WhereOp,
 )
 from adxlite.storage import udf
@@ -34,6 +36,13 @@ from adxlite.storage import udf
 
 class PandasOperatorExecutor:
     """Apply supported KQL operators directly to pandas DataFrames."""
+
+    def __init__(self) -> None:
+        self._database = None
+
+    def set_database(self, database: object) -> None:
+        """Set database reference for union/join operations that need to load tables."""
+        self._database = database
 
     def apply(self, dataframe: pd.DataFrame, operator: Operator) -> pd.DataFrame:
         """Apply one operator."""
@@ -70,6 +79,10 @@ class PandasOperatorExecutor:
             return dataframe.drop_duplicates(subset=columns).reset_index(drop=True)
         if isinstance(operator, ParseOp):
             return self._parse(dataframe, operator)
+        if isinstance(operator, JoinOp):
+            return self._join(dataframe, operator)
+        if isinstance(operator, UnionOp):
+            return self._union(dataframe, operator)
         raise KqlUnsupportedError(f"Pandas execution does not support '{type(operator).__name__}'")
 
     def _sort(self, dataframe: pd.DataFrame, operator: SortOp) -> pd.DataFrame:
@@ -355,3 +368,104 @@ class PandasOperatorExecutor:
         if isinstance(expr, FunctionCall):
             return expr.name
         return "expr"
+
+    def _join(self, dataframe: pd.DataFrame, operator: JoinOp) -> pd.DataFrame:
+        """Execute join in pandas."""
+        # Get right side data
+        if self._database is None:
+            raise ExecutionError("Database reference required for join in pandas mode")
+        right_source = operator.right.source.name
+        from adxlite.storage import Database
+        db: Database = self._database
+        schema = db.get_schema(right_source) if db.table_exists(right_source) else {}
+        right_df = db.query_dataframe(f"SELECT * FROM [{right_source}]", [], schema)
+
+        # Apply right-side pipeline operators if any
+        for op in operator.right.operators:
+            right_df = self.apply(right_df, op)
+
+        kind = operator.kind.lower()
+
+        # Build merge keys
+        left_on = [c.left_col for c in operator.conditions]
+        right_on = [c.right_col for c in operator.conditions]
+
+        if kind in {"leftanti", "leftantisemi"}:
+            # Left rows with no match on right
+            merged = dataframe.merge(right_df[right_on].drop_duplicates(), left_on=left_on, right_on=right_on, how='left', indicator=True)
+            result = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+            # Drop right key columns if different from left
+            for lk, rk in zip(left_on, right_on):
+                if lk != rk and rk in result.columns:
+                    result = result.drop(columns=[rk])
+            return result.reset_index(drop=True)
+
+        if kind in {"rightanti", "rightantisemi"}:
+            merged = right_df.merge(dataframe[left_on].drop_duplicates(), left_on=right_on, right_on=left_on, how='left', indicator=True)
+            result = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+            for lk, rk in zip(left_on, right_on):
+                if lk != rk and lk in result.columns:
+                    result = result.drop(columns=[lk])
+            return result.reset_index(drop=True)
+
+        if kind == "leftsemi":
+            merged = dataframe.merge(right_df[right_on].drop_duplicates(), left_on=left_on, right_on=right_on, how='inner')
+            # Drop right key columns if different from left
+            for lk, rk in zip(left_on, right_on):
+                if lk != rk and rk in merged.columns:
+                    merged = merged.drop(columns=[rk])
+            return merged[dataframe.columns].drop_duplicates().reset_index(drop=True)
+
+        if kind == "rightsemi":
+            merged = right_df.merge(dataframe[left_on].drop_duplicates(), left_on=right_on, right_on=left_on, how='inner')
+            for lk, rk in zip(left_on, right_on):
+                if lk != rk and lk in merged.columns:
+                    merged = merged.drop(columns=[lk])
+            return merged[right_df.columns].drop_duplicates().reset_index(drop=True)
+
+        # Standard merge joins
+        how_map = {
+            "inner": "inner",
+            "innerunique": "inner",
+            "leftouter": "left",
+            "rightouter": "right",
+            "fullouter": "outer",
+        }
+        how = how_map.get(kind, "inner")
+
+        # Handle column name suffixes for conflicts
+        result = dataframe.merge(right_df, left_on=left_on, right_on=right_on, how=how, suffixes=('', '_right'))
+        # Remove duplicate key columns from right side (if same name)
+        for lk, rk in zip(left_on, right_on):
+            if lk == rk and f"{rk}_right" in result.columns:
+                result = result.drop(columns=[f"{rk}_right"])
+        return result.reset_index(drop=True)
+
+    def _union(self, dataframe: pd.DataFrame, operator: UnionOp) -> pd.DataFrame:
+        """Execute union in pandas."""
+        if self._database is None:
+            raise ExecutionError("Database reference required for union in pandas mode")
+        from adxlite.storage import Database
+        db: Database = self._database
+
+        frames = [dataframe]
+        for table_name in operator.tables:
+            schema = db.get_schema(table_name) if db.table_exists(table_name) else {}
+            df = db.query_dataframe(f"SELECT * FROM [{table_name}]", [], schema)
+            if operator.withsource:
+                df.insert(0, operator.withsource, table_name)
+            frames.append(df)
+
+        if operator.withsource:
+            # Add source name to first frame too (it comes from the pipe source)
+            frames[0] = frames[0].copy()
+            frames[0].insert(0, operator.withsource, "__pipe_source")
+
+        if operator.kind == "inner":
+            common_cols = set(frames[0].columns)
+            for f in frames[1:]:
+                common_cols &= set(f.columns)
+            common_list = [c for c in frames[0].columns if c in common_cols]
+            frames = [f[common_list] for f in frames]
+
+        return pd.concat(frames, ignore_index=True)

@@ -11,12 +11,15 @@ from adxlite.parser.ast_nodes import (
     FunctionCall,
     Identifier,
     InListExpr,
+    JoinCondition,
+    JoinOp,
     Literal,
     NamedExpr,
     ParseOp,
     Pipeline,
     ProjectAwayOp,
     ProjectOp,
+    QualifiedIdentifier,
     SortKey,
     SortOp,
     SummarizeOp,
@@ -24,6 +27,7 @@ from adxlite.parser.ast_nodes import (
     TakeOp,
     TopOp,
     UnaryOp,
+    UnionOp,
     WhereOp,
 )
 from adxlite.translator.functions import AGGREGATE_FUNCTIONS, SCALAR_FUNCTIONS
@@ -32,6 +36,18 @@ from adxlite.translator.sql_utils import quote_identifier
 
 class SqlTranslator:
     """Translate supported KQL AST nodes into SQLite SQL."""
+
+    def __init__(self) -> None:
+        self._let_scalars: dict[str, object] = {}
+        self._known_columns: set[str] = set()
+
+    def set_let_scalars(self, scalars: dict[str, object]) -> None:
+        """Register scalar let bindings for parameter substitution."""
+        self._let_scalars = dict(scalars)
+
+    def set_known_columns(self, columns: set[str]) -> None:
+        """Register known column names that should NOT be substituted by let scalars."""
+        self._known_columns = columns
 
     def translate(self, pipeline: Pipeline) -> tuple[str, list[object]]:
         """Translate a pipeline into SQL and parameters."""
@@ -109,11 +125,140 @@ class SqlTranslator:
                 columns.append(expr_sql)
                 distinct_params.extend(expr_params)
             return f"SELECT DISTINCT {', '.join(columns)} FROM {base}", distinct_params + params
+        if isinstance(operator, UnionOp):
+            return self._translate_union(sql, params, operator)
+        if isinstance(operator, JoinOp):
+            return self._translate_join(sql, params, operator)
         if isinstance(operator, ParseOp):
             raise TranslationError("Parse operator requires pandas execution")
         if isinstance(operator, ProjectAwayOp):
             raise TranslationError("Project-away must be resolved before SQL translation")
         raise KqlUnsupportedError(f"Unsupported operator type '{type(operator).__name__}'")
+
+    def _translate_union(self, left_sql: str, left_params: list[object], operator: UnionOp) -> tuple[str, list[object]]:
+        """Translate union pipe operator to SQL UNION ALL.
+
+        For MVP, uses UNION ALL without schema alignment (SQLite dynamic typing
+        handles mismatched columns). Schema alignment is handled by the planner/executor.
+        """
+        parts = [left_sql]
+        all_params = list(left_params)
+        for table in operator.tables:
+            parts.append(f"SELECT * FROM {quote_identifier(table)}")
+        union_sql = " UNION ALL ".join(parts)
+        return f"SELECT * FROM ({union_sql}) AS _u", all_params
+
+    def _translate_join(self, left_sql: str, left_params: list[object], operator: JoinOp) -> tuple[str, list[object]]:
+        """Translate join operator to SQL JOIN."""
+        right_sql, right_params = self.translate(operator.right)
+        kind = operator.kind.lower()
+
+        # Build ON clause
+        on_parts: list[str] = []
+        for cond in operator.conditions:
+            on_parts.append(f"_l.{quote_identifier(cond.left_col)} = _r.{quote_identifier(cond.right_col)}")
+        on_clause = " AND ".join(on_parts)
+
+        # Determine SQL join type
+        if kind in {"inner", "innerunique"}:
+            join_type = "INNER JOIN"
+        elif kind == "leftouter":
+            join_type = "LEFT JOIN"
+        elif kind == "rightouter":
+            # SQLite doesn't support RIGHT JOIN; swap sides
+            join_type = "LEFT JOIN"
+            left_sql, right_sql = right_sql, left_sql
+            left_params, right_params = right_params, left_params
+            # Swap on clause direction
+            on_parts = []
+            for cond in operator.conditions:
+                on_parts.append(f"_l.{quote_identifier(cond.right_col)} = _r.{quote_identifier(cond.left_col)}")
+            on_clause = " AND ".join(on_parts)
+        elif kind == "fullouter":
+            return self._translate_full_outer_join(left_sql, left_params, right_sql, right_params, operator)
+        elif kind in {"leftanti", "leftantisemi"}:
+            return self._translate_anti_join(left_sql, left_params, right_sql, right_params, operator, side="left")
+        elif kind in {"rightanti", "rightantisemi"}:
+            return self._translate_anti_join(left_sql, left_params, right_sql, right_params, operator, side="right")
+        elif kind == "leftsemi":
+            return self._translate_semi_join(left_sql, left_params, right_sql, right_params, operator, side="left")
+        elif kind == "rightsemi":
+            return self._translate_semi_join(left_sql, left_params, right_sql, right_params, operator, side="right")
+        else:
+            raise KqlUnsupportedError(f"Unsupported join kind '{kind}'")
+
+        result_sql = f"SELECT * FROM ({left_sql}) AS _l {join_type} ({right_sql}) AS _r ON {on_clause}"
+        return result_sql, left_params + right_params
+
+    def _translate_anti_join(
+        self, left_sql: str, left_params: list[object],
+        right_sql: str, right_params: list[object],
+        operator: JoinOp, side: str,
+    ) -> tuple[str, list[object]]:
+        """Translate leftanti/rightanti using NOT EXISTS."""
+        if side == "right":
+            left_sql, right_sql = right_sql, left_sql
+            left_params, right_params = right_params, left_params
+
+        where_parts = []
+        for cond in operator.conditions:
+            l_col = cond.left_col if side == "left" else cond.right_col
+            r_col = cond.right_col if side == "left" else cond.left_col
+            where_parts.append(f"_l.{quote_identifier(l_col)} = _r.{quote_identifier(r_col)}")
+
+        result_sql = (
+            f"SELECT _l.* FROM ({left_sql}) AS _l "
+            f"WHERE NOT EXISTS (SELECT 1 FROM ({right_sql}) AS _r WHERE {' AND '.join(where_parts)})"
+        )
+        return result_sql, left_params + right_params
+
+    def _translate_semi_join(
+        self, left_sql: str, left_params: list[object],
+        right_sql: str, right_params: list[object],
+        operator: JoinOp, side: str,
+    ) -> tuple[str, list[object]]:
+        """Translate leftsemi/rightsemi using EXISTS."""
+        if side == "right":
+            left_sql, right_sql = right_sql, left_sql
+            left_params, right_params = right_params, left_params
+
+        where_parts = []
+        for cond in operator.conditions:
+            l_col = cond.left_col if side == "left" else cond.right_col
+            r_col = cond.right_col if side == "left" else cond.left_col
+            where_parts.append(f"_l.{quote_identifier(l_col)} = _r.{quote_identifier(r_col)}")
+
+        result_sql = (
+            f"SELECT _l.* FROM ({left_sql}) AS _l "
+            f"WHERE EXISTS (SELECT 1 FROM ({right_sql}) AS _r WHERE {' AND '.join(where_parts)})"
+        )
+        return result_sql, left_params + right_params
+
+    def _translate_full_outer_join(
+        self, left_sql: str, left_params: list[object],
+        right_sql: str, right_params: list[object],
+        operator: JoinOp,
+    ) -> tuple[str, list[object]]:
+        """Translate fullouter using LEFT JOIN + UNION ALL unmatched right rows."""
+        on_parts = []
+        anti_parts = []
+        for cond in operator.conditions:
+            on_parts.append(f"_l.{quote_identifier(cond.left_col)} = _r.{quote_identifier(cond.right_col)}")
+            anti_parts.append(f"_l.{quote_identifier(cond.left_col)} = _r2.{quote_identifier(cond.right_col)}")
+
+        on_clause = " AND ".join(on_parts)
+        anti_clause = " AND ".join(anti_parts)
+
+        # LEFT JOIN gets all left rows + matched right
+        left_join = f"SELECT * FROM ({left_sql}) AS _l LEFT JOIN ({right_sql}) AS _r ON {on_clause}"
+        # Unmatched right rows
+        right_only = (
+            f"SELECT * FROM ({right_sql}) AS _r2 "
+            f"WHERE NOT EXISTS (SELECT 1 FROM ({left_sql}) AS _l WHERE {anti_clause})"
+        )
+
+        result_sql = f"SELECT * FROM ({left_join} UNION ALL {right_only}) AS _fo"
+        return result_sql, left_params + right_params + right_params + left_params
 
     def _translate_named_expr(self, item: NamedExpr) -> tuple[str, list[object]]:
         sql, params = self._translate_expr(item.expr)
@@ -159,7 +304,13 @@ class SqlTranslator:
 
     def _translate_expr(self, expr: Expr) -> tuple[str, list[object]]:
         if isinstance(expr, Identifier):
+            # Column names take precedence over let scalars (Kusto semantics)
+            if expr.name in self._let_scalars and expr.name not in self._known_columns:
+                return "?", [self._let_scalars[expr.name]]
             return quote_identifier(expr.name), []
+        if isinstance(expr, QualifiedIdentifier):
+            prefix = "_l" if expr.scope == "left" else "_r"
+            return f"{prefix}.{quote_identifier(expr.name)}", []
         if isinstance(expr, Literal):
             return "?", [expr.value]
         if isinstance(expr, UnaryOp):
