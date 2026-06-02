@@ -85,10 +85,10 @@ class SqlTranslator:
             group_sql: list[str] = []
             group_aliases: list[str] = []
             all_params: list[object] = []
-            for expr in operator.by:
-                sql_text, expr_params = self._translate_expr(expr)
+            for named_expr in operator.by:
+                sql_text, expr_params = self._translate_expr(named_expr.expr)
                 group_sql.append(sql_text)
-                group_aliases.append(self._infer_expr_name(expr))
+                group_aliases.append(named_expr.alias or self._infer_expr_name(named_expr.expr))
                 all_params.extend(expr_params)
             select_parts = [
                 f"{sql_text} AS {quote_identifier(alias)}"

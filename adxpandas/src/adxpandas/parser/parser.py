@@ -175,10 +175,13 @@ class Parser:
         if keyword == "extend":
             return ExtendOp(self._parse_named_expr_list())
         if keyword == "summarize":
-            aggs = self._parse_named_expr_list()
-            by: tuple[Expr, ...] = ()
+            by: tuple[NamedExpr, ...] = ()
             if self._match_keyword("by"):
-                by = tuple(self._parse_expression_list())
+                by = self._parse_named_expr_list()
+                return SummarizeOp(aggregations=(), by=by)
+            aggs = self._parse_named_expr_list()
+            if self._match_keyword("by"):
+                by = self._parse_named_expr_list()
             return SummarizeOp(aggregations=aggs, by=by)
         if keyword in {"take", "limit"}:
             return TakeOp(self._parse_positive_int())
@@ -468,6 +471,13 @@ class Parser:
                     self._advance()
                     self._advance()
                     expr = self._parse_between(expr, negated=True)
+                    continue
+                # !has, !contains, !startswith, !endswith → negate the binary op result
+                if self._peek().type == TokenType.KEYWORD and self._peek().value in {"contains", "startswith", "endswith", "has"}:
+                    self._advance()  # consume 'not'
+                    op_name = self._advance().value  # consume the operator keyword
+                    right = self._parse_additive()
+                    expr = UnaryOp("not", BinaryOp(expr, op_name, right))
                     continue
             return expr
 

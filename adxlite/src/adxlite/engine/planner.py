@@ -124,9 +124,9 @@ class Planner:
             return result
         if isinstance(operator, SummarizeOp):
             result: dict[str, str] = {}
-            for expr in operator.by:
-                alias = self._infer_expr_name(expr)
-                result[alias] = self._infer_expr_type(expr, schema)
+            for named_expr in operator.by:
+                alias = named_expr.alias or self._infer_expr_name(named_expr.expr)
+                result[alias] = self._infer_expr_type(named_expr.expr, schema)
             for item in operator.aggregations:
                 alias = item.alias or self._infer_expr_name(item.expr)
                 result[alias] = self._infer_aggregation_type(item.expr, schema)

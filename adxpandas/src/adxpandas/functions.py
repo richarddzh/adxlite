@@ -242,6 +242,9 @@ def kql_split(text: Any, delimiter: Any) -> str | None:
     delimiter = _safe_text(delimiter)
     if text is None or delimiter is None:
         return None
+    if delimiter == "":
+        # KQL split with empty delimiter returns each character
+        return json.dumps(list(text))
     return json.dumps(text.split(delimiter))
 
 

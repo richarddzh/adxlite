@@ -149,7 +149,19 @@ class Tokenizer:
                 elif self._peek(1) == '~':
                     tokens.append(self._consume_pair(TokenType.NE, '!~'))
                 else:
-                    raise KqlParseError(f"Unexpected character '!' at position {self._index}")
+                    # Handle !in, !between, !has, !contains, !startswith, !endswith
+                    # by emitting KEYWORD "not" and letting the next identifier be parsed normally
+                    rest = self._text[self._index + 1:]
+                    bang_keywords = ("in", "between", "has", "contains", "startswith", "endswith")
+                    matched = False
+                    for kw in bang_keywords:
+                        if rest.startswith(kw) and (len(rest) == len(kw) or not (rest[len(kw)].isalnum() or rest[len(kw)] == '_')):
+                            tokens.append(Token(TokenType.KEYWORD, "not", self._index))
+                            self._index += 1  # skip '!'
+                            matched = True
+                            break
+                    if not matched:
+                        raise KqlParseError(f"Unexpected character '!' at position {self._index}")
             elif char == '.':
                 if self._peek(1) == '.':
                     tokens.append(self._consume_pair(TokenType.DOTDOT, '..'))

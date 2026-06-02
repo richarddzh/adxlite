@@ -135,7 +135,7 @@ class ExtendOp(Operator):
 @dataclass(frozen=True)
 class SummarizeOp(Operator):
     aggregations: tuple[NamedExpr, ...]
-    by: tuple[Expr, ...] = ()
+    by: tuple[NamedExpr, ...] = ()
 
 
 @dataclass(frozen=True)

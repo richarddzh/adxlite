@@ -104,9 +104,9 @@ class PandasOperatorExecutor:
         if operator.by:
             working = dataframe.copy()
             group_names: list[str] = []
-            for index, expr in enumerate(operator.by):
-                column_name = self._infer_expr_name(expr) or f"group_{index}"
-                working[column_name] = self._evaluate_expr(working, expr)
+            for index, named_expr in enumerate(operator.by):
+                column_name = named_expr.alias or self._infer_expr_name(named_expr.expr) or f"group_{index}"
+                working[column_name] = self._evaluate_expr(working, named_expr.expr)
                 group_names.append(column_name)
             grouped = working.groupby(group_names, dropna=False, sort=False)
             rows = []

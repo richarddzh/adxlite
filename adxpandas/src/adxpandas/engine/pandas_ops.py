@@ -114,9 +114,9 @@ class PandasOperatorExecutor:
         if operator.by:
             working = dataframe.copy()
             group_names: list[str] = []
-            for index, expr in enumerate(operator.by):
-                column_name = self._infer_expr_name(expr) or f"group_{index}"
-                working[column_name] = self._evaluate_expr(working, expr)
+            for index, named_expr in enumerate(operator.by):
+                column_name = named_expr.alias or self._infer_expr_name(named_expr.expr) or f"group_{index}"
+                working[column_name] = self._evaluate_expr(working, named_expr.expr)
                 group_names.append(column_name)
             grouped = working.groupby(group_names, dropna=False, sort=False)
             rows = []
@@ -129,6 +129,7 @@ class PandasOperatorExecutor:
                     alias = item.alias or self._infer_expr_name(item.expr)
                     row[alias] = self._evaluate_aggregation(group, item.expr)
                 rows.append(row)
+            return pd.DataFrame(rows)
             return pd.DataFrame(rows)
         row = {}
         for item in operator.aggregations:
@@ -288,7 +289,10 @@ class PandasOperatorExecutor:
                 result = result + value.astype(str) if isinstance(value, pd.Series) else result + str(value)
             return result
         if name in {"iif", "iff"}:
-            return args[1].where(args[0].fillna(False), args[2])
+            condition = args[0] if isinstance(args[0], pd.Series) else pd.Series([args[0]] * len(dataframe))
+            true_val = args[1] if isinstance(args[1], pd.Series) else pd.Series([args[1]] * len(dataframe))
+            false_val = args[2] if isinstance(args[2], pd.Series) else pd.Series([args[2]] * len(dataframe))
+            return true_val.where(condition.fillna(False), false_val)
         if name == "coalesce":
             result = args[0]
             for value in args[1:]:
