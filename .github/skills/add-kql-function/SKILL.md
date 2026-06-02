@@ -1,6 +1,9 @@
 ---
-name: "Adding a KQL Function"
-description: "Step-by-step guide for implementing a new KQL scalar or aggregation function"
+name: add-kql-function
+description: >
+  Use this skill when implementing a new KQL scalar or aggregation function (e.g., strlen,
+  extract, dcount). Covers function implementation in adxpandas, SQLite UDF registration in
+  adxlite, pandas fallback, null handling, and known edge cases like iif scalar wrapping.
 ---
 
 # Skill: Adding a New KQL Function

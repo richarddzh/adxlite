@@ -1,6 +1,9 @@
 ---
-name: "Writing Tests"
-description: "Guidelines for writing tests in the adxlite monorepo (adxpandas + adxlite)"
+name: writing-tests
+description: >
+  Use this skill when writing, updating, or debugging tests for adxpandas or adxlite.
+  Covers test structure, pandas version compatibility (CI uses pandas 2.x, local uses 3.x),
+  test file organization by category, and known pitfalls with null handling across versions.
 ---
 
 # Skill: Writing Tests for adxpandas / adxlite

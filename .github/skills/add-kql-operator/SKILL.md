@@ -1,6 +1,9 @@
 ---
-name: "Adding a KQL Operator"
-description: "Step-by-step guide for implementing a new KQL tabular operator in the adxlite monorepo"
+name: add-kql-operator
+description: >
+  Use this skill when implementing a new KQL tabular operator (e.g., mv-expand, union, render).
+  Covers AST node creation, tokenizer/parser changes, pandas engine implementation, adxlite
+  SQL translation, planner updates, and testing requirements for both packages.
 ---
 
 # Skill: Adding a New KQL Operator

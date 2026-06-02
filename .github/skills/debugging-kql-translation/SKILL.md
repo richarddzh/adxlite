@@ -1,6 +1,9 @@
 ---
-name: "Debugging KQL Translation"
-description: "How to diagnose and fix KQL parsing, translation, and execution issues"
+name: debugging-kql-translation
+description: >
+  Use this skill when debugging KQL query failures, incorrect results, parse errors, or
+  runtime exceptions. Covers token stream inspection, AST debugging, SQL generation tracing,
+  and a table of known issues with their root causes and fixes.
 ---
 
 # Skill: Debugging KQL Translation Issues

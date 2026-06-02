@@ -1,6 +1,9 @@
 ---
-name: "Environment Management"
-description: "Managing dependencies and virtual environment in the adxlite monorepo"
+name: environment-management
+description: >
+  Use this skill when adding or removing dependencies, updating Python version requirements,
+  or troubleshooting environment issues. Covers pyproject.toml management, venv rebuilding,
+  and the minimal-dependency principle.
 ---
 
 # Skill: Environment and Dependency Management
