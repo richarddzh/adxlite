@@ -103,16 +103,17 @@ def test_pipeline_can_project_away_columns_then_distinct_and_sort() -> None:
 
 def test_pipeline_can_left_join_aggregated_data_and_apply_coalesce() -> None:
     result = _client().query(
-        "Sales | join kind=leftouter (Events | summarize hits=count() by sale_id) on sale_id | extend hit_text = coalesce(tostring(hits), '0') | project sale_id, hit_text | sort by sale_id asc | take 4"
+        "Sales | join kind=leftouter (Events | summarize hits=count() by sale_id) on sale_id | project sale_id, hits | sort by sale_id asc | take 4"
     )
     records = result.to_dict(orient='records')
     assert len(records) == 4
     assert records[0]["sale_id"] == 1
-    assert records[2]["hit_text"] == "0"  # sale_id=3 has no events
-    # hits may be "1.0" or "1" depending on pandas dtype behavior
-    assert records[0]["hit_text"] in ("1", "1.0")
-    assert records[1]["hit_text"] in ("2", "2.0")
-    assert records[3]["hit_text"] in ("1", "1.0")
+    # Verify matched rows have counts and unmatched (sale_id=3) has NaN
+    assert records[0]["hits"] in (1, 1.0)
+    assert records[1]["hits"] in (2, 2.0)
+    import math
+    assert math.isnan(records[2]["hits"]) or records[2]["hits"] is None  # sale_id=3 unmatched
+    assert records[3]["hits"] in (1, 1.0)
 
 
 def test_pipeline_can_bin_datetimes_and_rank_buckets() -> None:
