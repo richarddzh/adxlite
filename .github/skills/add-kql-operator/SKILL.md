@@ -1,9 +1,6 @@
 ---
 name: add-kql-operator
-description: >
-  Use this skill when implementing a new KQL tabular operator (e.g., mv-expand, union, render).
-  Covers AST node creation, tokenizer/parser changes, pandas engine implementation, adxlite
-  SQL translation, planner updates, and testing requirements for both packages.
+description: Use this skill when implementing a new KQL tabular operator. Covers AST nodes, tokenizer, parser, pandas engine, SQL translation, and testing.
 ---
 
 # Skill: Adding a New KQL Operator

@@ -1,9 +1,6 @@
 ---
 name: writing-tests
-description: >
-  Use this skill when writing, updating, or debugging tests for adxpandas or adxlite.
-  Covers test structure, pandas version compatibility (CI uses pandas 2.x, local uses 3.x),
-  test file organization by category, and known pitfalls with null handling across versions.
+description: Use this skill when writing or debugging tests for adxpandas or adxlite. Covers test structure, pandas version compatibility, and known pitfalls.
 ---
 
 # Skill: Writing Tests for adxpandas / adxlite

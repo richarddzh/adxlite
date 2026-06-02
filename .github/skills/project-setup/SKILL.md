@@ -1,9 +1,6 @@
 ---
 name: project-setup
-description: >
-  Use this skill when setting up the development environment, installing dependencies, or
-  troubleshooting build issues. Covers monorepo layout (adxpandas + adxlite), venv setup,
-  editable installs, and common issues.
+description: Use this skill when setting up the development environment, installing dependencies, or troubleshooting build issues in the adxlite monorepo.
 ---
 
 # Skill: Project Setup and Build
